@@ -18,11 +18,17 @@ from app.ai.signal import Signal
 SYSTEM_PROMPT = (
     "Sen — TITAN AI nomli institutsional darajadagi Forex/Gold trading tahlilchisisan. "
     "Sening vazifang: berilgan texnik signalni professional, ishonchli va TUSHUNARLI "
-    "tarzda O'ZBEK TILIDA izohlash. Smart Money Concepts (BOS, CHoCH, Order Block, FVG, "
-    "Liquidity Sweep) atamalaridan foydalanma qo'rqma, lekin ularni qisqa izohlab ket. "
-    "Javob 4-6 jumladan oshmasin. Signal asoslarini mantiqiy bog'lab tushuntir. "
+    "tarzda O'ZBEK TILIDA izohlash. Javob 4-6 jumladan oshmasin. "
+    "Signal asoslarini mantiqiy bog'lab tushuntir. "
     "Oxirida bitta qisqa risk eslatmasi yoz. Investitsiya maslahati berma — bu tahlil, kafolat emas. "
-    "Emoji ishlatma yoki juda oz ishlat. Faqat berilgan ma'lumotga tayan, narx to'qib chiqarma."
+    "Emoji ishlatma yoki juda oz ishlat. Faqat berilgan ma'lumotga tayan, narx to'qib chiqarma. "
+    "\n\nAtamalar (to'g'ri ma'nolari, boshqacha ochib berma):\n"
+    "- BOS = Break of Structure (bozor tuzilishining buzilishi, trend davomi signali)\n"
+    "- CHoCH = Change of Character (trend o'zgarishining birinchi belgisi)\n"
+    "- FVG = Fair Value Gap (uch shamli narx bo'shlig'i / imbalance)\n"
+    "- Order Block (OB) = institutsional buyurtma zonasi\n"
+    "- Liquidity Sweep = narxning stop-loss'larni yig'ib teskari qaytishi\n"
+    "- HH/HL = Higher High / Higher Low (ko'tarilish tuzilishi)"
 )
 
 
@@ -57,7 +63,7 @@ class GrokClient:
         Key sozlanmagan bo'lsa — zaxira (texnik) izoh qaytaradi.
         """
         if not self.is_configured:
-            log.warning("Grok API key yo'q — zaxira izoh ishlatilmoqda.")
+            log.warning("AI API key yo'q — zaxira izoh ishlatilmoqda.")
             return self._fallback_explanation(signal)
 
         prompt = self.build_prompt(signal)
@@ -74,11 +80,11 @@ class GrokClient:
             )
             text = (resp.choices[0].message.content or "").strip()
             if not text:
-                raise GrokAPIError("Grok bo'sh javob qaytardi")
-            log.info(f"Grok tushuntirish tayyor ({len(text)} belgi)")
+                raise GrokAPIError("AI bo'sh javob qaytardi")
+            log.info(f"AI tushuntirish tayyor ({len(text)} belgi)")
             return text
         except Exception as e:  # noqa: BLE001
-            log.error(f"Grok xatoligi: {e} — zaxira izohga o'tildi")
+            log.error(f"AI xatoligi: {e} — zaxira izohga o'tildi")
             return self._fallback_explanation(signal)
 
     # ------------------------------------------------------------------ #

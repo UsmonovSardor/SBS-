@@ -25,7 +25,7 @@ def check_environment() -> bool:
 
     checks = {
         "MT5 (terminal orqali)": True,  # ochiq terminal sessiyasiga ulanadi
-        "Grok API key": bool(settings.grok_api_key),
+        "AI API key (Groq)": bool(settings.grok_api_key),
         "Telegram token": bool(settings.telegram_bot_token),
         "Telegram kanal": bool(settings.telegram_channel_id),
     }
@@ -37,7 +37,7 @@ def check_environment() -> bool:
         log.error("Telegram sozlanmagan (.env) — bot ishga tushmaydi.")
         return False
     if not settings.grok_api_key:
-        log.warning("Grok key yo'q — signal izohlari zaxira rejimda bo'ladi.")
+        log.warning("AI key yo'q — signal izohlari zaxira rejimda bo'ladi.")
     if settings.is_live:
         log.warning("⚠️  LIVE rejim! Real pul bilan savdo. Ehtiyot bo'ling.")
     return True
