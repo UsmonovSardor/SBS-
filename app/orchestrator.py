@@ -22,8 +22,9 @@ from app.ai import FusionEngine, GrokClient
 from app.ai.signal import Signal
 from app.charting import ChartRenderer, Zone
 from app.core.config import settings
-from app.core.constants import Timeframe
+from app.core.constants import TITAN_MAGIC, Timeframe
 from app.core.logger import log
+from app.database import Journal
 from app.execution import PositionMonitor, TradeExecutor
 from app.market import DataFeed, MT5Connector
 from app.smc import FVGAnalyzer, OrderBlockAnalyzer
@@ -64,7 +65,8 @@ class TitanOrchestrator:
         self.engine = FusionEngine()
         self.grok = GrokClient()
         self.renderer = ChartRenderer()
-        self.tgbot = TitanTelegramBot(executor=self.executor)
+        self.journal = Journal()
+        self.tgbot = TitanTelegramBot(executor=self.executor, journal=self.journal)
         self.tracker = SignalTracker(settings.signal_cooldown_min)
         self.monitor = PositionMonitor(self.executor)
         self.ob = OrderBlockAnalyzer()
@@ -118,12 +120,17 @@ class TitanOrchestrator:
                     chart = self.renderer.render(df, signal, zones=self._build_zones(df, signal.price_at_signal))
                     # Grok tarmoq chaqiruvi — event loop'ni bloklamaslik uchun thread'da
                     signal.ai_explanation = await asyncio.to_thread(self.grok.explain_signal, signal)
-                    await self.tgbot.send_signal(signal, chart)
+                    db_id = await asyncio.to_thread(self.journal.log_signal, signal)
+                    await self.tgbot.send_signal(signal, chart, signal_db_id=db_id)
                     log.info(f"📤 Yangi signal yuborildi: {signal.summary()}")
 
                     # AUTO_TRADE yoqilgan bo'lsa — tugmasiz avtomatik savdo
                     if settings.auto_trade:
                         result = await asyncio.to_thread(self.executor.open_signal, signal)
+                        if result.success:
+                            await asyncio.to_thread(
+                                self.journal.log_trade, result.order, signal,
+                                result.volume, result.price, db_id)
                         log.info(f"🤖 Avto-savdo: {'ochildi #' + str(result.order) if result.success else result.message}")
             except Exception as e:  # noqa: BLE001
                 log.error(f"Skaner tsikli xatoligi: {e}")
@@ -139,9 +146,17 @@ class TitanOrchestrator:
         while self.running:
             try:
                 await asyncio.to_thread(self.monitor.manage_all)
+                await asyncio.to_thread(self._sync_journal)
             except Exception as e:  # noqa: BLE001
                 log.error(f"Monitor tsikli xatoligi: {e}")
             await asyncio.sleep(settings.monitor_interval)
+
+    def _sync_journal(self) -> None:
+        """MT5'da yopilgan savdolarni jurnalда 'closed' deb belgilaydi."""
+        positions = [p for p in self.executor.positions() if p.magic == TITAN_MAGIC]
+        open_tickets = {p.ticket for p in positions}
+        profits = {p.ticket: p.profit for p in positions}
+        self.journal.sync_closed(open_tickets, profits)
 
     # ------------------------------------------------------------------ #
     #  Ishga tushirish

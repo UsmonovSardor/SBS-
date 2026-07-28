@@ -23,6 +23,7 @@ from app.core.config import settings
 from app.core.constants import Direction
 from app.core.logger import log
 from app.ai.signal import Signal
+from app.database import Journal
 from app.execution import TradeExecutor
 from app.telegram.keyboards import signal_keyboard, traded_keyboard
 
@@ -32,13 +33,15 @@ CAPTION_LIMIT = 1024  # Telegram rasm izohi (caption) chegarasi
 class TitanTelegramBot:
     """TITAN AI Telegram boti."""
 
-    def __init__(self, executor: TradeExecutor | None = None) -> None:
+    def __init__(self, executor: TradeExecutor | None = None,
+                 journal: Journal | None = None) -> None:
         if not settings.telegram_bot_token:
             raise ValueError("TELEGRAM_BOT_TOKEN .env da yo'q")
         self.bot = Bot(token=settings.telegram_bot_token)
         self.dp = Dispatcher()
         self.executor = executor or TradeExecutor()
-        self.pending: dict[str, Signal] = {}     # signal_id -> Signal
+        self.journal = journal
+        self.pending: dict[str, tuple[Signal, int | None]] = {}  # signal_id -> (Signal, db_id)
         self._register()
 
     # ------------------------------------------------------------------ #
@@ -46,6 +49,7 @@ class TitanTelegramBot:
     # ------------------------------------------------------------------ #
     def _register(self) -> None:
         self.dp.message(Command("id", "start", "myid"))(self._on_id)
+        self.dp.message(Command("stats"))(self._on_stats)
         self.dp.callback_query(F.data.startswith("trade:"))(self._on_trade)
         self.dp.callback_query(F.data.startswith("skip:"))(self._on_skip)
         self.dp.callback_query(F.data == "noop")(self._on_noop)
@@ -53,10 +57,11 @@ class TitanTelegramBot:
     # ------------------------------------------------------------------ #
     #  Signalni yuborish
     # ------------------------------------------------------------------ #
-    async def send_signal(self, signal: Signal, chart_path: str) -> str:
+    async def send_signal(self, signal: Signal, chart_path: str,
+                          signal_db_id: int | None = None) -> str:
         """Signalni kanalga yuboradi. Signal_id qaytaradi."""
         signal_id = uuid.uuid4().hex[:12]
-        self.pending[signal_id] = signal
+        self.pending[signal_id] = (signal, signal_db_id)
 
         caption = self._format_caption(signal)
         await self.bot.send_photo(
@@ -102,10 +107,11 @@ class TitanTelegramBot:
             log.warning(f"Ruxsatsiz trade urinishi: user={cb.from_user.id}")
             return
 
-        signal = self.pending.get(signal_id)
-        if signal is None:
+        entry = self.pending.get(signal_id)
+        if entry is None:
             await cb.answer("⏳ Signal eskirgan yoki topilmadi.", show_alert=True)
             return
+        signal, db_id = entry
 
         await cb.answer("⏳ Savdo ochilmoqda...")
         try:
@@ -122,8 +128,13 @@ class TitanTelegramBot:
             )
             return
 
-        # Muvaffaqiyat — xabarni yangilaymiz
+        # Muvaffaqiyat — jurnalga yozamiz va xabarni yangilaymiz
         self.pending.pop(signal_id, None)
+        if self.journal:
+            try:
+                self.journal.log_trade(result.order, signal, result.volume, result.price, db_id)
+            except Exception as e:  # noqa: BLE001
+                log.error(f"Jurnalga yozishda xato: {e}")
         who = cb.from_user.full_name
         await cb.message.edit_reply_markup(reply_markup=traded_keyboard(result.order))
         await cb.message.reply(
@@ -145,6 +156,25 @@ class TitanTelegramBot:
 
     async def _on_noop(self, cb: CallbackQuery) -> None:
         await cb.answer()
+
+    # ------------------------------------------------------------------ #
+    #  /stats — statistika
+    # ------------------------------------------------------------------ #
+    async def _on_stats(self, msg: Message) -> None:
+        if self.journal is None:
+            await msg.reply("Statistika mavjud emas (jurnal ulanmagan).")
+            return
+        s = self.journal.stats()
+        await msg.reply(
+            f"📊 <b>TITAN AI statistika</b>\n"
+            f"━━━━━━━━━━━━━━\n"
+            f"📡 Signallar: {s['signals']}\n"
+            f"💼 Savdolar: {s['trades']} (ochiq: {s['open']}, yopilgan: {s['closed']})\n"
+            f"✅ Yutuq: {s['wins']}  ❌ Yutqaziq: {s['losses']}\n"
+            f"🎯 Win-rate: {s['win_rate']}%\n"
+            f"💰 Umumiy foyda: {s['total_profit']} USD",
+            parse_mode=ParseMode.HTML,
+        )
 
     # ------------------------------------------------------------------ #
     #  /id, /start — foydalanuvchi Telegram ID sini ko'rsatadi
