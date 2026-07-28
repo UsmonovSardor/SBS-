@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     max_lot: float = Field(default=1.0, alias="MAX_LOT")          # xavfsizlik: maksimal lot
     default_symbols: str = Field(default="EURUSD,XAUUSD", alias="DEFAULT_SYMBOLS")
 
+    # --- Real-time skaner ---
+    scan_interval: int = Field(default=60, alias="SCAN_INTERVAL")           # soniya
+    signal_cooldown_min: int = Field(default=30, alias="SIGNAL_COOLDOWN_MIN")  # bir simvol qayta signal oralig'i
+    scan_timeframes: str = Field(default="M5,M15,H1", alias="SCAN_TIMEFRAMES")
+    auto_trade: bool = Field(default=False, alias="AUTO_TRADE")             # signal kelishi bilan avtomatik savdo (tugmasiz)
+
     # --- Umumiy ---
     timezone: str = Field(default="Asia/Tashkent", alias="TIMEZONE")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
@@ -81,6 +87,11 @@ class Settings(BaseSettings):
     def is_live(self) -> bool:
         """Real (live) savdo rejimimi? Hozircha faqat demo tavsiya etiladi."""
         return self.trading_mode.lower() == "live"
+
+    @property
+    def scan_timeframe_list(self) -> list[str]:
+        """Skanlanadigan taymfrejmlar ro'yxati (string)."""
+        return [t.strip().upper() for t in self.scan_timeframes.split(",") if t.strip()]
 
 
 # Global singleton — butun loyiha shu obyektni ishlatadi
