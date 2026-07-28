@@ -39,6 +39,10 @@ class SymbolInfo:
     volume_min: float
     volume_max: float
     volume_step: float
+    tick_size: float     # narx bir qadamda qancha o'zgaradi
+    tick_value: float    # bir tick 1 lotда qancha pul (account valyutasida)
+    stops_level: int     # SL/TP uchun minimal masofa (punktlarda)
+    filling_mode: int    # ruxsat etilgan filling rejimlari (bitmask)
 
 
 @dataclass
@@ -84,6 +88,10 @@ class DataFeed:
             volume_min=raw.volume_min,
             volume_max=raw.volume_max,
             volume_step=raw.volume_step,
+            tick_size=raw.trade_tick_size,
+            tick_value=raw.trade_tick_value,
+            stops_level=raw.trade_stops_level,
+            filling_mode=raw.filling_mode,
         )
 
     # ------------------------------------------------------------------ #

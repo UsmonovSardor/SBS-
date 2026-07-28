@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     trading_mode: str = Field(default="demo", alias="TRADING_MODE")
     default_risk_percent: float = Field(default=1.0, alias="DEFAULT_RISK_PERCENT")
     max_daily_trades: int = Field(default=5, alias="MAX_DAILY_TRADES")
+    max_lot: float = Field(default=1.0, alias="MAX_LOT")          # xavfsizlik: maksimal lot
     default_symbols: str = Field(default="EURUSD,XAUUSD", alias="DEFAULT_SYMBOLS")
 
     # --- Umumiy ---

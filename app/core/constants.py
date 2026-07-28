@@ -64,3 +64,8 @@ MAX_SPREAD_POINTS = 30          # ruxsat etilgan maksimal spread
 
 # --- Grafik ---
 CHART_CANDLES = 120             # grafikda ko'rsatiladigan shamlar soni
+
+# --- Execution (MT5) ---
+TITAN_MAGIC = 20260728          # TITAN AI ochgan savdolarni tanib olish uchun
+DEFAULT_DEVIATION = 20          # narx og'ishi (slippage) ruxsati, punktda
+DEFAULT_LOT = 0.01              # zaxira minimal lot
