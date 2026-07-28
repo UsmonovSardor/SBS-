@@ -11,6 +11,7 @@ Keyin ICT / Wyckoff / Harmonic / News qo'shiladi (vaznlar qayta taqsimlanadi).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 
 import pandas as pd
 
@@ -85,6 +86,7 @@ class FusionEngine:
         symbol: str,
         timeframe: str,
         digits: int = 5,
+        now: datetime | None = None,
     ) -> FusionResult:
         price = float(df["close"].iloc[-1])
         avg_range = float((df["high"] - df["low"]).mean()) or 1e-9
@@ -102,7 +104,7 @@ class FusionEngine:
         # Konflikt jarimasi bilan confidence (0-100)
         confidence = max(0.0, min(100.0, winning - losing * CONFLICT_PENALTY))
         # ICT Kill Zone: savdo sessiyasiga qarab confidence'ni moslash
-        session = current_session()
+        session = current_session(now)
         confidence = round(max(0.0, min(100.0, confidence * session.factor)), 1)
 
         result = FusionResult(
