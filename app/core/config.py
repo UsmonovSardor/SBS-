@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Loyiha ildizi (bu fayl: app/core/config.py -> 2 pog'ona yuqoriga)
@@ -50,6 +50,15 @@ class Settings(BaseSettings):
     # --- Umumiy ---
     timezone: str = Field(default="Asia/Tashkent", alias="TIMEZONE")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+
+    # ---- Validatorlar ----
+    @field_validator("mt5_login", mode="before")
+    @classmethod
+    def _empty_login_to_zero(cls, v: object) -> object:
+        """Bo'sh MT5_LOGIN (=) ni 0 ga aylantiradi (terminal sessiyasiga ulanish uchun)."""
+        if v is None or (isinstance(v, str) and v.strip() == ""):
+            return 0
+        return v
 
     # ---- Yordamchi property'lar ----
     @property
