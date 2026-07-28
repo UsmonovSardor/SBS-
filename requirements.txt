@@ -1,0 +1,34 @@
+# ============================================================
+# TITAN AI — Python bog'liqliklari (dependencies)
+# O'rnatish:  pip install -r requirements.txt
+# ============================================================
+
+# --- MetaTrader 5 (faqat Windows) ---
+MetaTrader5==5.0.45
+
+# --- Ma'lumotlar tahlili ---
+pandas==2.2.2
+numpy==1.26.4
+
+# --- Grafik chizish ---
+mplfinance==0.12.10b0
+matplotlib==3.9.0
+
+# --- Grok (xAI) / AI — OpenAI-mos SDK orqali ---
+openai==1.40.0
+httpx==0.27.0
+
+# --- Telegram bot ---
+aiogram==3.10.0
+
+# --- Sozlamalar / muhit ---
+python-dotenv==1.0.1
+pydantic==2.8.2
+pydantic-settings==2.4.0
+
+# --- Utility ---
+pytz==2024.1
+loguru==0.7.2
+
+# --- Test (ixtiyoriy) ---
+pytest==8.3.2

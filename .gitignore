@@ -1,0 +1,80 @@
+# ============================================================
+# TITAN AI — .gitignore
+# MUHIM: Maxfiy ma'lumotlar (API kalitlar, parollar) hech qachon
+# GitHub'ga tushmasligi kerak. Quyidagilar bloklanadi.
+# ============================================================
+
+# --- Maxfiy sozlamalar / kalitlar ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+credentials/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --- Virtual environment ---
+venv/
+env/
+ENV/
+.venv/
+.virtualenv/
+
+# --- IDE ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- Loglar va ma'lumotlar ---
+logs/*.log
+logs/*.txt
+data/*.csv
+data/*.parquet
+data/*.db
+data/*.sqlite
+*.log
+
+# --- Grafiklar (vaqtinchalik) ---
+charts/
+*.png
+!docs/*.png
+
+# --- Testlar / cache ---
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- MetaTrader ---
+*.ex5
+*.mq5
