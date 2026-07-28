@@ -31,14 +31,16 @@ from app.smc import (
     OrderBlockAnalyzer,
     StructureAnalyzer,
 )
+from app.strategies import MomentumStrategy, current_session
 
-# MVP ovoz beruvchilar vazni (jami = 100)
+# Ovoz beruvchilar vazni (jami = 100)
 MVP_WEIGHTS: dict[str, float] = {
-    "trend": 25,
-    "structure": 20,   # BOS / CHoCH
-    "order_block": 20,
-    "fvg": 15,
-    "liquidity": 20,
+    "trend": 20,
+    "structure": 18,   # BOS / CHoCH
+    "order_block": 17,
+    "fvg": 12,
+    "liquidity": 18,
+    "momentum": 15,    # EMA momentum
 }
 
 # Qarama-qarshi ovozlar confidence'ni qancha pasaytiradi (0-1)
@@ -72,6 +74,7 @@ class FusionEngine:
         self.order_block = OrderBlockAnalyzer()
         self.fvg = FVGAnalyzer()
         self.liquidity = LiquidityAnalyzer()
+        self.momentum = MomentumStrategy()
 
     # ------------------------------------------------------------------ #
     #  Asosiy: DataFrame -> Signal (yoki None, agar WAIT bo'lsa)
@@ -97,7 +100,10 @@ class FusionEngine:
         )
         winning, losing = max(buy_score, sell_score), min(buy_score, sell_score)
         # Konflikt jarimasi bilan confidence (0-100)
-        confidence = round(max(0.0, min(100.0, winning - losing * CONFLICT_PENALTY)), 1)
+        confidence = max(0.0, min(100.0, winning - losing * CONFLICT_PENALTY))
+        # ICT Kill Zone: savdo sessiyasiga qarab confidence'ni moslash
+        session = current_session()
+        confidence = round(max(0.0, min(100.0, confidence * session.factor)), 1)
 
         result = FusionResult(
             symbol=symbol,
@@ -132,6 +138,7 @@ class FusionEngine:
             return result
 
         reasons = [f"{v.strategy}: {v.reason}" for v in votes if v.direction == direction]
+        reasons.append(f"session: {session.name} (confidence x{session.factor})")
         result.signal = Signal(
             symbol=symbol,
             timeframe=timeframe,
@@ -210,6 +217,11 @@ class FusionEngine:
         else:
             votes.append(Vote("liquidity", Direction.WAIT, MVP_WEIGHTS["liquidity"], 0,
                               "sweep yo'q"))
+
+        # 6) MOMENTUM (EMA)
+        mom = self.momentum.evaluate(df)
+        votes.append(Vote("momentum", mom.direction, MVP_WEIGHTS["momentum"],
+                          mom.confidence, mom.reason))
 
         return votes
 
