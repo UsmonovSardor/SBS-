@@ -94,23 +94,31 @@ python main.py
 
 ## 🗺️ Yo'l xaritasi (Roadmap)
 
-### ✅ Faza 1 — Ishlaydigan yadro (MVP) — *hozir qurilmoqda*
+### ✅ Faza 1 — Ishlaydigan yadro (MVP) — TUGADI
 - [x] Loyiha skeleti + core infratuzilma
-- [ ] MT5 ulanish + real-time narx
-- [ ] Market Structure (BOS/CHoCH) + Order Block + FVG
-- [ ] Oddiy Fusion engine (voting + score)
-- [ ] Grok bilan signal tushuntirish
-- [ ] Grafik generatsiya
-- [ ] Telegram signal + Auto-Trade tugmasi
-- [ ] MT5 demo'da savdo ochish (TP/SL)
+- [x] MT5 ulanish + real-time narx
+- [x] Market Structure (BOS/CHoCH) + Order Block + FVG + Liquidity
+- [x] Fusion engine (voting + score + confidence)
+- [x] AI (Groq) bilan signal tushuntirish
+- [x] Grafik generatsiya (Entry/SL/TP + zonalar)
+- [x] Telegram signal + Auto-Trade tugmasi
+- [x] MT5 demo'da savdo ochish (TP/SL)
+- [x] Real-time orkestrator (uzluksiz skan)
 
-### 🔜 Faza 2+
-- [ ] ICT (AMD, OTE, Judas, Silver Bullet), Wyckoff, Harmonic, Elliott
-- [ ] PostgreSQL + Redis
-- [ ] Backtesting engine
+### ✅ Faza 2 — TUGADI
+- [x] Admin himoyasi (/id) + Min SL sifat filtri
+- [x] Pozitsiya monitoringi (break-even + trailing stop)
+- [x] Trading Journal (SQLite) + /stats
+- [x] Qo'shimcha strategiyalar (Momentum/EMA + ICT Kill Zones)
+- [x] Backtesting engine (walk-forward)
+- [x] Deploy qo'llanma (Windows VPS, [docs/DEPLOY.md](docs/DEPLOY.md))
+
+### 🔮 Faza 3+ (kelajak)
+- [ ] Strategiyani optimallashtirish (backtest asosida tuning)
+- [ ] Harmonic / Elliott / Wyckoff (murakkab pattern'lar)
+- [ ] PostgreSQL + Redis (enterprise miqyos)
 - [ ] AI self-learning / optimization
-- [ ] Docker + VPS deployment
-- [ ] Monitoring & admin panel
+- [ ] Linux + MetaApi (bulut deploy)
 
 ---
 
