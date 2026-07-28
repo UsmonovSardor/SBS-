@@ -214,6 +214,30 @@ class TradeExecutor:
                            order=ticket, price=result.price, volume=p.volume)
 
     # ------------------------------------------------------------------ #
+    #  SL/TP ni o'zgartirish (trailing / break-even uchun)
+    # ------------------------------------------------------------------ #
+    def modify_sltp(self, ticket: int, sl: float | None = None, tp: float | None = None) -> TradeResult:
+        self.conn.ensure_connected()
+        raw = mt5.positions_get(ticket=ticket)
+        if not raw:
+            raise ExecutionError(f"Pozitsiya topilmadi: ticket={ticket}")
+        p = raw[0]
+        request = {
+            "action": mt5.TRADE_ACTION_SLTP,
+            "symbol": p.symbol,
+            "position": ticket,
+            "sl": sl if sl is not None else p.sl,
+            "tp": tp if tp is not None else p.tp,
+            "magic": TITAN_MAGIC,
+        }
+        result = mt5.order_send(request)
+        if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+            code = result.retcode if result else -1
+            msg = result.comment if result else "None"
+            return TradeResult(success=False, retcode=code, message=msg, order=ticket)
+        return TradeResult(success=True, retcode=result.retcode, message="SL/TP yangilandi", order=ticket)
+
+    # ------------------------------------------------------------------ #
     #  Yordamchilar
     # ------------------------------------------------------------------ #
     def _adjust_stops(self, signal: Signal, price: float, info, is_buy: bool):

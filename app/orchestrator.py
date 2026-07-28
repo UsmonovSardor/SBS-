@@ -24,7 +24,7 @@ from app.charting import ChartRenderer, Zone
 from app.core.config import settings
 from app.core.constants import Timeframe
 from app.core.logger import log
-from app.execution import TradeExecutor
+from app.execution import PositionMonitor, TradeExecutor
 from app.market import DataFeed, MT5Connector
 from app.smc import FVGAnalyzer, OrderBlockAnalyzer
 from app.telegram import TitanTelegramBot
@@ -66,6 +66,7 @@ class TitanOrchestrator:
         self.renderer = ChartRenderer()
         self.tgbot = TitanTelegramBot(executor=self.executor)
         self.tracker = SignalTracker(settings.signal_cooldown_min)
+        self.monitor = PositionMonitor(self.executor)
         self.ob = OrderBlockAnalyzer()
         self.fvg = FVGAnalyzer()
 
@@ -129,6 +130,20 @@ class TitanOrchestrator:
             await asyncio.sleep(settings.scan_interval)
 
     # ------------------------------------------------------------------ #
+    #  Pozitsiya monitoring tsikli (break-even + trailing)
+    # ------------------------------------------------------------------ #
+    async def monitor_loop(self) -> None:
+        if not settings.position_manage:
+            log.info("Pozitsiya monitoringi o'chirilgan (POSITION_MANAGE=false).")
+            return
+        while self.running:
+            try:
+                await asyncio.to_thread(self.monitor.manage_all)
+            except Exception as e:  # noqa: BLE001
+                log.error(f"Monitor tsikli xatoligi: {e}")
+            await asyncio.sleep(settings.monitor_interval)
+
+    # ------------------------------------------------------------------ #
     #  Ishga tushirish
     # ------------------------------------------------------------------ #
     async def run(self) -> None:
@@ -146,10 +161,11 @@ class TitanOrchestrator:
         log.info(f"  Telegram guruh: {settings.telegram_channel_id}")
         log.info("=" * 58)
 
-        # Telegram polling + skaner parallel
+        # Telegram polling + skaner + monitoring parallel
         await asyncio.gather(
             self.tgbot.dp.start_polling(self.tgbot.bot),
             self.scanner_loop(),
+            self.monitor_loop(),
         )
 
     async def close(self) -> None:

@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     auto_trade: bool = Field(default=False, alias="AUTO_TRADE")             # signal kelishi bilan avtomatik savdo (tugmasiz)
     min_sl_atr_ratio: float = Field(default=0.6, alias="MIN_SL_ATR_RATIO")  # SL kamida shu marta o'rtacha shamdan uzoq bo'lsin (sifat filtri)
 
+    # --- Pozitsiya monitoringi (trailing / break-even) ---
+    position_manage: bool = Field(default=True, alias="POSITION_MANAGE")       # BE/trailing yoqilganmi
+    monitor_interval: int = Field(default=15, alias="MONITOR_INTERVAL")        # ochiq savdolarni tekshirish oralig'i (soniya)
+    break_even_progress: float = Field(default=0.4, alias="BREAK_EVEN_PROGRESS")  # TP tomon shuncha % bo'lsa SL entry'ga
+    trail_start_progress: float = Field(default=0.5, alias="TRAIL_START_PROGRESS")  # shu % dan keyin trailing boshlanadi
+    trail_lock: float = Field(default=0.5, alias="TRAIL_LOCK")                 # harakatning shu ulushini qulflaydi
+
     # --- Umumiy ---
     timezone: str = Field(default="Asia/Tashkent", alias="TIMEZONE")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
