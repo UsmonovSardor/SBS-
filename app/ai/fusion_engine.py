@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 
+from app.core.config import settings
 from app.core.constants import (
     CONFIDENCE_ELITE,
     CONFIDENCE_MIN_SIGNAL,
@@ -119,6 +120,15 @@ class FusionEngine:
         entry, sl, tp = self._calc_levels(direction, price, struct, avg_range, digits)
         if sl is None or tp is None:
             result.wait_reason = "SL/TP hisoblanmadi"
+            return result
+
+        # Min SL filtri: juda yaqin SL = sifatsiz signal (shovqin darajasi + ulkan lot xavfi)
+        min_sl = settings.min_sl_atr_ratio * avg_range
+        if abs(entry - sl) < min_sl:
+            result.wait_reason = (
+                f"SL juda yaqin ({abs(entry - sl):.5f} < {min_sl:.5f}) — sifatsiz, o'tkazildi"
+            )
+            log.debug(f"{symbol} {timeframe}: {result.wait_reason}")
             return result
 
         reasons = [f"{v.strategy}: {v.reason}" for v in votes if v.direction == direction]

@@ -16,7 +16,8 @@ import uuid
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.enums import ParseMode
-from aiogram.types import CallbackQuery, FSInputFile
+from aiogram.filters import Command
+from aiogram.types import CallbackQuery, FSInputFile, Message
 
 from app.core.config import settings
 from app.core.constants import Direction
@@ -44,6 +45,7 @@ class TitanTelegramBot:
     #  Handlerlarni ro'yxatga olish
     # ------------------------------------------------------------------ #
     def _register(self) -> None:
+        self.dp.message(Command("id", "start", "myid"))(self._on_id)
         self.dp.callback_query(F.data.startswith("trade:"))(self._on_trade)
         self.dp.callback_query(F.data.startswith("skip:"))(self._on_skip)
         self.dp.callback_query(F.data == "noop")(self._on_noop)
@@ -143,6 +145,25 @@ class TitanTelegramBot:
 
     async def _on_noop(self, cb: CallbackQuery) -> None:
         await cb.answer()
+
+    # ------------------------------------------------------------------ #
+    #  /id, /start — foydalanuvchi Telegram ID sini ko'rsatadi
+    # ------------------------------------------------------------------ #
+    async def _on_id(self, msg: Message) -> None:
+        uid = msg.from_user.id
+        is_admin = (not settings.admin_ids) or (uid in settings.admin_ids)
+        role = "✅ admin" if (settings.admin_ids and uid in settings.admin_ids) else (
+            "⚠️ admin ro'yxati bo'sh (hamma bosa oladi)" if not settings.admin_ids else "❌ admin emas"
+        )
+        await msg.reply(
+            f"👤 <b>Sizning Telegram ID:</b> <code>{uid}</code>\n"
+            f"Ism: {html.escape(msg.from_user.full_name)}\n"
+            f"Huquq: {role}\n\n"
+            f"Bu ID ni .env dagi <code>TELEGRAM_ADMIN_IDS</code> ga qo'shsangiz, "
+            f"faqat siz Auto-Trade tugmasini bosa olasiz.",
+            parse_mode=ParseMode.HTML,
+        )
+        log.info(f"/id so'raldi: user={uid} ({msg.from_user.full_name}) admin={is_admin}")
 
     # ------------------------------------------------------------------ #
     #  Ishga tushirish (polling)

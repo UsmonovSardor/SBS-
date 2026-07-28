@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     signal_cooldown_min: int = Field(default=30, alias="SIGNAL_COOLDOWN_MIN")  # bir simvol qayta signal oralig'i
     scan_timeframes: str = Field(default="M5,M15,H1", alias="SCAN_TIMEFRAMES")
     auto_trade: bool = Field(default=False, alias="AUTO_TRADE")             # signal kelishi bilan avtomatik savdo (tugmasiz)
+    min_sl_atr_ratio: float = Field(default=0.6, alias="MIN_SL_ATR_RATIO")  # SL kamida shu marta o'rtacha shamdan uzoq bo'lsin (sifat filtri)
 
     # --- Umumiy ---
     timezone: str = Field(default="Asia/Tashkent", alias="TIMEZONE")
