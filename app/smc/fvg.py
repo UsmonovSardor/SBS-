@@ -26,6 +26,7 @@ class FVG:
     time: pd.Timestamp
     filled: bool = False   # keyin narx bu zonaga kirdimi
     size: float = 0.0      # zona balandligi (top - bottom)
+    inverted: bool = False  # Inverse FVG (qutbi almashgan)mi
 
     @property
     def midpoint(self) -> float:
@@ -105,3 +106,53 @@ class FVGAnalyzer:
     def fresh(self, df: pd.DataFrame) -> list[FVG]:
         """Faqat to'ldirilmagan (fresh) FVG larni qaytaradi."""
         return [g for g in self.find(df) if not g.filled]
+
+    # ------------------------------------------------------------------ #
+    #  Inverse FVG: close bilan buzilgan (qutbi almashgan) FVG
+    # ------------------------------------------------------------------ #
+    def find_inverse(self, df: pd.DataFrame) -> list[FVG]:
+        """
+        Inverse FVG (IFVG) larni qaytaradi.
+
+        FVG close bilan qarama-qarshi chegaradan o'tsa — qutbi almashadi:
+          - Bullish FVG pastga (close < bottom) buzilsa -> SELL inverse (resistance)
+          - Bearish FVG yuqoriga (close > top) buzilsa   -> BUY inverse (support)
+        Manba: TITAN AI TRADING BIBLE, 4-bob (Inverse FVG).
+        """
+        closes = df["close"].to_numpy()
+        highs = df["high"].to_numpy()
+        lows = df["low"].to_numpy()
+        times = df.index
+        out: list[FVG] = []
+
+        for g in self.find(df):
+            break_idx: int | None = None
+            for k in range(g.index + 1, len(df)):
+                if g.direction == Direction.BUY and closes[k] < g.bottom:
+                    break_idx = k
+                    break
+                if g.direction == Direction.SELL and closes[k] > g.top:
+                    break_idx = k
+                    break
+            if break_idx is None:
+                continue
+
+            flipped = Direction.SELL if g.direction == Direction.BUY else Direction.BUY
+            retested = False
+            for k in range(break_idx + 1, len(df)):
+                if lows[k] <= g.top and highs[k] >= g.bottom:
+                    retested = True
+                    break
+            out.append(
+                FVG(
+                    direction=flipped,
+                    top=g.top,
+                    bottom=g.bottom,
+                    index=break_idx,
+                    time=times[break_idx],
+                    filled=retested,
+                    size=g.size,
+                    inverted=True,
+                )
+            )
+        return out

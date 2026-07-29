@@ -28,12 +28,13 @@ class SwingPoint:
 
 @dataclass
 class StructureEvent:
-    """Struktura hodisasi (BOS yoki CHoCH)."""
-    kind: str            # "BOS" | "CHOCH"
+    """Struktura hodisasi (BOS, CHoCH yoki MSS)."""
+    kind: str            # "BOS" | "CHOCH" | "MSS"
     direction: Direction  # BUY (bullish) | SELL (bearish)
     price: float          # buzilgan swing narxi
     time: pd.Timestamp    # buzilgan sham vaqti
     broken_swing: float   # buzilgan swing nuqta narxi
+    displacement: float = 0.0  # buzuvchi sham tanasi o'rtacha tanaga nisbatan (kuch)
 
 
 @dataclass
@@ -62,6 +63,13 @@ class StructureResult:
                 return ev
         return None
 
+    @property
+    def last_mss(self) -> StructureEvent | None:
+        for ev in reversed(self.events):
+            if ev.kind == "MSS":
+                return ev
+        return None
+
 
 class StructureAnalyzer:
     """
@@ -72,9 +80,12 @@ class StructureAnalyzer:
         result = analyzer.analyze(df)   # df — get_candles() natijasi
     """
 
-    def __init__(self, lookback: int = 2) -> None:
+    def __init__(self, lookback: int = 2, mss_displacement_ratio: float = 1.5) -> None:
         # lookback — swing aniqlashda chap/o'ng tomondagi shamlar soni
         self.lookback = lookback
+        # mss_displacement_ratio — CHoCH ni MSS ga ko'taruvchi minimal displacement
+        # (buzuvchi sham tanasi o'rtacha tanadan shuncha marta katta bo'lsa = MSS)
+        self.mss_displacement_ratio = mss_displacement_ratio
 
     # ------------------------------------------------------------------ #
     #  1) Swing nuqtalarni topish (fraktal usuli)
@@ -146,7 +157,17 @@ class StructureAnalyzer:
         """
         events: list[StructureEvent] = []
         closes = df["close"].to_numpy()
+        opens = df["open"].to_numpy()
+        bodies = abs(closes - opens)
+        avg_body = float(bodies.mean()) or 1e-9
         times = df.index
+
+        def classify(base_kind: str, idx: int) -> tuple[str, float]:
+            """CHoCH ni displacement kuchiga qarab MSS ga ko'taradi."""
+            disp = float(bodies[idx] / avg_body)
+            if base_kind == "CHOCH" and disp >= self.mss_displacement_ratio:
+                return "MSS", disp
+            return base_kind, disp
 
         # swing nuqtalarni indeks bo'yicha birlashtiramiz
         sh = sorted(swing_highs, key=lambda s: s.index)
@@ -179,7 +200,8 @@ class StructureAnalyzer:
 
             # Yuqoriga buzilish (swing high)
             if last_high and close > last_high.price:
-                kind = "BOS" if current_trend == Trend.BULLISH else "CHOCH"
+                base = "BOS" if current_trend == Trend.BULLISH else "CHOCH"
+                kind, disp = classify(base, i)
                 events.append(
                     StructureEvent(
                         kind=kind,
@@ -187,6 +209,7 @@ class StructureAnalyzer:
                         price=float(close),
                         time=times[i],
                         broken_swing=last_high.price,
+                        displacement=round(disp, 2),
                     )
                 )
                 # buzilgan swingni "iste'mol qilingan" deb belgilaymiz
@@ -194,7 +217,8 @@ class StructureAnalyzer:
 
             # Pastga buzilish (swing low)
             if last_low and close < last_low.price:
-                kind = "BOS" if current_trend == Trend.BEARISH else "CHOCH"
+                base = "BOS" if current_trend == Trend.BEARISH else "CHOCH"
+                kind, disp = classify(base, i)
                 events.append(
                     StructureEvent(
                         kind=kind,
@@ -202,6 +226,7 @@ class StructureAnalyzer:
                         price=float(close),
                         time=times[i],
                         broken_swing=last_low.price,
+                        displacement=round(disp, 2),
                     )
                 )
                 last_low = None

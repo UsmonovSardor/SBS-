@@ -28,6 +28,7 @@ from app.database import Journal
 from app.execution import PositionMonitor, TradeExecutor
 from app.market import DataFeed, MT5Connector
 from app.smc import FVGAnalyzer, OrderBlockAnalyzer
+from app.strategies import higher_timeframe
 from app.telegram import TitanTelegramBot
 
 
@@ -87,7 +88,15 @@ class TitanOrchestrator:
                 try:
                     info = self.feed.get_symbol_info(symbol)
                     df = self.feed.get_candles(symbol, tf, count=200)
-                    res = self.engine.analyze(df, symbol, tf.value, digits=info.digits)
+                    # Yuqori taymfrejm konfluensi (MTF) uchun HTF shamlar
+                    htf_tf = higher_timeframe(tf)
+                    htf_df = (
+                        self.feed.get_candles(symbol, htf_tf, count=200)
+                        if htf_tf != tf else None
+                    )
+                    res = self.engine.analyze(
+                        df, symbol, tf.value, digits=info.digits, htf_df=htf_df
+                    )
                     if res.is_signal:
                         candle_time = df.index[-1]
                         if self.tracker.is_new(res.signal, candle_time):

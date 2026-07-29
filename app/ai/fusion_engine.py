@@ -2,11 +2,12 @@
 TITAN AI — Multi-Strategy Fusion Engine (qaror markazi).
 
 Manba: TITAN AI TRADING BIBLE, 40-bob (Institutional Core).
-Barcha tahlil modullarini (Structure, Order Block, FVG, Liquidity) birlashtirib,
-ovoz berish (voting) + vazn (weight) + konsensus asosida yagona signal chiqaradi.
+Barcha tahlil modullarini birlashtirib, ovoz berish (voting) + vazn (weight) +
+konsensus asosida yagona signal chiqaradi.
 
-MVP bosqichi: 5 ta ovoz beruvchi (trend, struktura, order block, fvg, liquidity).
-Keyin ICT / Wyckoff / Harmonic / News qo'shiladi (vaznlar qayta taqsimlanadi).
+Faol ovoz beruvchilar (vazn manbai: constants.ACTIVE_WEIGHTS, jami = 100):
+  trend, structure (BOS/CHoCH/MSS), order_block (+Breaker), fvg (+Inverse),
+  liquidity, momentum, htf_bias (MTF konfluens), premium_discount (equilibrium).
 """
 from __future__ import annotations
 
@@ -17,6 +18,7 @@ import pandas as pd
 
 from app.core.config import settings
 from app.core.constants import (
+    ACTIVE_WEIGHTS,
     CONFIDENCE_ELITE,
     CONFIDENCE_MIN_SIGNAL,
     DEFAULT_RR,
@@ -32,20 +34,32 @@ from app.smc import (
     OrderBlockAnalyzer,
     StructureAnalyzer,
 )
-from app.strategies import MomentumStrategy, current_session
+from app.strategies import (
+    HtfBias,
+    MomentumStrategy,
+    PremiumDiscountStrategy,
+    current_session,
+)
 
-# Ovoz beruvchilar vazni (jami = 100)
-MVP_WEIGHTS: dict[str, float] = {
-    "trend": 20,
-    "structure": 18,   # BOS / CHoCH
-    "order_block": 17,
-    "fvg": 12,
-    "liquidity": 18,
-    "momentum": 15,    # EMA momentum
-}
+# Ovoz beruvchilar vazni — yagona manba (jami = 100)
+WEIGHTS = ACTIVE_WEIGHTS
 
 # Qarama-qarshi ovozlar confidence'ni qancha pasaytiradi (0-1)
 CONFLICT_PENALTY: float = 0.4
+
+
+@dataclass
+class ZoneHit:
+    """Narxga yaqin yo'nalishli zona (OB/Breaker yoki FVG/Inverse)."""
+    direction: Direction
+    bottom: float
+    top: float
+    confidence: float
+    label: str
+
+    @property
+    def midpoint(self) -> float:
+        return (self.top + self.bottom) / 2
 
 
 @dataclass
@@ -76,6 +90,8 @@ class FusionEngine:
         self.fvg = FVGAnalyzer()
         self.liquidity = LiquidityAnalyzer()
         self.momentum = MomentumStrategy()
+        self.premium_discount = PremiumDiscountStrategy()
+        self.htf_bias = HtfBias()
 
     # ------------------------------------------------------------------ #
     #  Asosiy: DataFrame -> Signal (yoki None, agar WAIT bo'lsa)
@@ -87,12 +103,13 @@ class FusionEngine:
         timeframe: str,
         digits: int = 5,
         now: datetime | None = None,
+        htf_df: pd.DataFrame | None = None,
     ) -> FusionResult:
         price = float(df["close"].iloc[-1])
         avg_range = float((df["high"] - df["low"]).mean()) or 1e-9
 
         struct = self.structure.analyze(df)
-        votes = self._collect_votes(df, price, avg_range, struct)
+        votes = self._collect_votes(df, price, avg_range, struct, htf_df)
 
         buy_score = sum(v.weight for v in votes if v.direction == Direction.BUY)
         sell_score = sum(v.weight for v in votes if v.direction == Direction.SELL)
@@ -163,92 +180,110 @@ class FusionEngine:
     # ------------------------------------------------------------------ #
     #  Ovozlarni yig'ish
     # ------------------------------------------------------------------ #
-    def _collect_votes(self, df, price, avg_range, struct) -> list[Vote]:
+    def _collect_votes(self, df, price, avg_range, struct, htf_df=None) -> list[Vote]:
         votes: list[Vote] = []
 
         # 1) TREND (structure.trend)
         if struct.trend == Trend.BULLISH:
-            votes.append(Vote("trend", Direction.BUY, MVP_WEIGHTS["trend"], 80,
+            votes.append(Vote("trend", Direction.BUY, WEIGHTS["trend"], 80,
                               "trend yuqoriga (HH+HL)"))
         elif struct.trend == Trend.BEARISH:
-            votes.append(Vote("trend", Direction.SELL, MVP_WEIGHTS["trend"], 80,
+            votes.append(Vote("trend", Direction.SELL, WEIGHTS["trend"], 80,
                               "trend pastga (LH+LL)"))
         else:
-            votes.append(Vote("trend", Direction.WAIT, MVP_WEIGHTS["trend"], 0,
+            votes.append(Vote("trend", Direction.WAIT, WEIGHTS["trend"], 0,
                               "trend aniq emas (range)"))
 
-        # 2) STRUCTURE EVENT (oxirgi BOS/CHoCH)
+        # 2) STRUCTURE EVENT (oxirgi BOS / CHoCH / MSS)
         ev = struct.last_event
         if ev is not None:
-            conf = 85 if ev.kind == "BOS" else 75
-            votes.append(Vote("structure", ev.direction, MVP_WEIGHTS["structure"], conf,
+            conf = {"MSS": 90, "BOS": 85}.get(ev.kind, 75)
+            votes.append(Vote("structure", ev.direction, WEIGHTS["structure"], conf,
                               f"oxirgi {ev.kind} {ev.direction.value} "
                               f"(swing {ev.broken_swing:.5f} buzildi)"))
         else:
-            votes.append(Vote("structure", Direction.WAIT, MVP_WEIGHTS["structure"], 0,
+            votes.append(Vote("structure", Direction.WAIT, WEIGHTS["structure"], 0,
                               "struktura hodisasi yo'q"))
 
-        # 3) ORDER BLOCK (narxga yaqin fresh OB)
-        ob = self._nearest_fresh_ob(df, price, avg_range)
+        # 3) ORDER BLOCK / BREAKER (narxga yaqin zona)
+        ob = self._ob_zone_hit(df, price, avg_range)
         if ob is not None:
-            votes.append(Vote("order_block", ob.direction, MVP_WEIGHTS["order_block"],
-                              min(95, 60 + ob.strength * 10),
-                              f"{ob.direction.value} OB zona [{ob.bottom:.5f}-{ob.top:.5f}] "
-                              f"kuch={ob.strength}x"))
+            votes.append(Vote("order_block", ob.direction, WEIGHTS["order_block"],
+                              ob.confidence,
+                              f"{ob.direction.value} {ob.label} "
+                              f"[{ob.bottom:.5f}-{ob.top:.5f}]"))
         else:
-            votes.append(Vote("order_block", Direction.WAIT, MVP_WEIGHTS["order_block"], 0,
-                              "yaqin fresh OB yo'q"))
+            votes.append(Vote("order_block", Direction.WAIT, WEIGHTS["order_block"], 0,
+                              "yaqin OB/Breaker yo'q"))
 
-        # 4) FVG (narxga yaqin fresh FVG)
-        fvg = self._nearest_fresh_fvg(df, price, avg_range)
+        # 4) FVG / INVERSE FVG (narxga yaqin zona)
+        fvg = self._fvg_zone_hit(df, price, avg_range)
         if fvg is not None:
-            votes.append(Vote("fvg", fvg.direction, MVP_WEIGHTS["fvg"], 70,
-                              f"{fvg.direction.value} FVG bo'shliq "
+            votes.append(Vote("fvg", fvg.direction, WEIGHTS["fvg"], fvg.confidence,
+                              f"{fvg.direction.value} {fvg.label} "
                               f"[{fvg.bottom:.5f}-{fvg.top:.5f}]"))
         else:
-            votes.append(Vote("fvg", Direction.WAIT, MVP_WEIGHTS["fvg"], 0,
-                              "yaqin fresh FVG yo'q"))
+            votes.append(Vote("fvg", Direction.WAIT, WEIGHTS["fvg"], 0,
+                              "yaqin FVG yo'q"))
 
         # 5) LIQUIDITY (oxirgi sweep)
         _, sweeps = self.liquidity.analyze(df)
         if sweeps:
             last_sweep = sweeps[-1]
-            votes.append(Vote("liquidity", last_sweep.direction, MVP_WEIGHTS["liquidity"], 75,
+            votes.append(Vote("liquidity", last_sweep.direction, WEIGHTS["liquidity"], 75,
                               f"{last_sweep.direction.value} liquidity sweep "
                               f"(daraja {last_sweep.level:.5f})"))
         else:
-            votes.append(Vote("liquidity", Direction.WAIT, MVP_WEIGHTS["liquidity"], 0,
+            votes.append(Vote("liquidity", Direction.WAIT, WEIGHTS["liquidity"], 0,
                               "sweep yo'q"))
 
         # 6) MOMENTUM (EMA)
         mom = self.momentum.evaluate(df)
-        votes.append(Vote("momentum", mom.direction, MVP_WEIGHTS["momentum"],
+        votes.append(Vote("momentum", mom.direction, WEIGHTS["momentum"],
                           mom.confidence, mom.reason))
+
+        # 7) HTF BIAS (yuqori taymfrejm konfluensi)
+        htf = self.htf_bias.evaluate(htf_df)
+        votes.append(Vote("htf_bias", htf.direction, WEIGHTS["htf_bias"],
+                          htf.confidence, htf.reason))
+
+        # 8) PREMIUM / DISCOUNT (equilibrium)
+        pd_res = self.premium_discount.evaluate(df)
+        votes.append(Vote("premium_discount", pd_res.direction, WEIGHTS["premium_discount"],
+                          pd_res.confidence, pd_res.reason))
 
         return votes
 
     # ------------------------------------------------------------------ #
-    #  Yordamchi: narxga yaqin fresh OB / FVG
+    #  Yordamchi: narxga yaqin zona (OB/Breaker, FVG/Inverse)
     # ------------------------------------------------------------------ #
-    def _nearest_fresh_ob(self, df, price, avg_range):
+    def _ob_zone_hit(self, df, price, avg_range) -> ZoneHit | None:
         near = 2.0 * avg_range
-        candidates = [
-            b for b in self.order_block.find(df)
-            if not b.mitigated and (b.bottom - near) <= price <= (b.top + near)
-        ]
-        if not candidates:
+        hits: list[ZoneHit] = []
+        for b in self.order_block.find(df):
+            if not b.mitigated and (b.bottom - near) <= price <= (b.top + near):
+                hits.append(ZoneHit(b.direction, b.bottom, b.top,
+                                    min(95, 60 + b.strength * 10),
+                                    f"OB (kuch={b.strength}x)"))
+        for br in self.order_block.find_breakers(df):
+            if (br.bottom - near) <= price <= (br.top + near):
+                hits.append(ZoneHit(br.direction, br.bottom, br.top, 70, "Breaker"))
+        if not hits:
             return None
-        return min(candidates, key=lambda b: abs(b.midpoint - price))
+        return min(hits, key=lambda z: abs(z.midpoint - price))
 
-    def _nearest_fresh_fvg(self, df, price, avg_range):
+    def _fvg_zone_hit(self, df, price, avg_range) -> ZoneHit | None:
         near = 2.0 * avg_range
-        candidates = [
-            g for g in self.fvg.find(df)
-            if not g.filled and (g.bottom - near) <= price <= (g.top + near)
-        ]
-        if not candidates:
+        hits: list[ZoneHit] = []
+        for g in self.fvg.find(df):
+            if not g.filled and (g.bottom - near) <= price <= (g.top + near):
+                hits.append(ZoneHit(g.direction, g.bottom, g.top, 70, "FVG"))
+        for iv in self.fvg.find_inverse(df):
+            if not iv.filled and (iv.bottom - near) <= price <= (iv.top + near):
+                hits.append(ZoneHit(iv.direction, iv.bottom, iv.top, 72, "Inverse FVG"))
+        if not hits:
             return None
-        return min(candidates, key=lambda g: abs(g.midpoint - price))
+        return min(hits, key=lambda z: abs(z.midpoint - price))
 
     # ------------------------------------------------------------------ #
     #  Entry / Stop Loss / Take Profit

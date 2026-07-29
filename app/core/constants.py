@@ -41,18 +41,23 @@ class SignalStrength(str, Enum):
     ELITE = "ELITE"         # >= 90
 
 
-# --- Fusion engine: strategiya vaznlari (jami = 100) ---
-# Manba: TITAN AI TRADING BIBLE, 40-bob (Multi-Strategy Fusion)
-STRATEGY_WEIGHTS: dict[str, int] = {
-    "trend": 20,
-    "liquidity": 20,
-    "smc": 15,
-    "ict": 10,
-    "wyckoff": 10,
-    "elliott": 10,
-    "harmonic": 5,
-    "news": 10,
+# --- Fusion engine: FAOL ovoz beruvchilar vazni (jami = 100) ---
+# Manba: TITAN AI TRADING BIBLE, 40-bob (Multi-Strategy Fusion).
+# MUHIM: bu — Fusion Engine amalda ISHLATADIGAN yagona vazn manbasi.
+# Har bir kalit `fusion_engine._collect_votes` dagi bitta ovozga mos keladi.
+# (Wyckoff/Elliott/Harmonic/News hali qurilmagan — ular Faza C da qo'shiladi va
+#  o'shanda bu jadval qayta muvozanatlanadi.)
+ACTIVE_WEIGHTS: dict[str, int] = {
+    "trend": 14,            # bozor trendi (HH/HL yoki LH/LL)
+    "structure": 15,        # BOS / CHoCH / MSS
+    "order_block": 13,      # Order Block + Breaker Block zonalari
+    "fvg": 10,              # Fair Value Gap + Inverse FVG
+    "liquidity": 14,        # Equal H/L sweep
+    "momentum": 9,          # EMA momentum
+    "htf_bias": 15,         # yuqori taymfrejm trend konfluensi (MTF)
+    "premium_discount": 10,  # equilibrium (faqat discountda BUY, premiumda SELL)
 }
+assert sum(ACTIVE_WEIGHTS.values()) == 100, "ACTIVE_WEIGHTS jami 100 bo'lishi shart"
 
 # --- Confidence chegaralari ---
 CONFIDENCE_MIN_SIGNAL = 60      # bundan past bo'lsa signal berilmaydi

@@ -2,7 +2,7 @@
 
 from app.smc.fvg import FVG, FVGAnalyzer
 from app.smc.liquidity import LiquidityAnalyzer, LiquidityPool, LiquiditySweep
-from app.smc.order_block import OrderBlock, OrderBlockAnalyzer
+from app.smc.order_block import BreakerBlock, OrderBlock, OrderBlockAnalyzer
 from app.smc.structure import (
     StructureAnalyzer,
     StructureEvent,
@@ -19,6 +19,7 @@ __all__ = [
     "FVG",
     "OrderBlockAnalyzer",
     "OrderBlock",
+    "BreakerBlock",
     "LiquidityAnalyzer",
     "LiquidityPool",
     "LiquiditySweep",

@@ -33,6 +33,29 @@ class OrderBlock:
         return (self.top + self.bottom) / 2
 
 
+@dataclass
+class BreakerBlock:
+    """
+    Breaker Block — buzilgan Order Block.
+
+    Order Block qarama-qarshi tomonga close bilan buzilsa, u qutbini almashtiradi:
+      - Bullish OB (support) pastga buzilsa -> Bearish Breaker (resistance, SELL)
+      - Bearish OB (resistance) yuqoriga buzilsa -> Bullish Breaker (support, BUY)
+    Narx qaytib bu zonaga kelsa (retest), tez-tez kuchli reaksiya beradi.
+    Manba: TITAN AI TRADING BIBLE, 3-bob (Breaker Block).
+    """
+    direction: Direction   # yangi (almashgan) yo'nalish
+    top: float
+    bottom: float
+    index: int             # buzilish sodir bo'lgan sham indeksi
+    time: pd.Timestamp
+    retested: bool = False  # narx buzilishdan keyin zonaga qaytib keldimi
+
+    @property
+    def midpoint(self) -> float:
+        return (self.top + self.bottom) / 2
+
+
 class OrderBlockAnalyzer:
     """
     Order Block zonalarini topadi.
@@ -120,3 +143,52 @@ class OrderBlockAnalyzer:
     def fresh(self, df: pd.DataFrame) -> list[OrderBlock]:
         """Faqat hali sinalmagan (fresh) Order Block larni qaytaradi."""
         return [b for b in self.find(df) if not b.mitigated]
+
+    # ------------------------------------------------------------------ #
+    #  Breaker Block: qarama-qarshi tomonga buzilgan Order Block
+    # ------------------------------------------------------------------ #
+    def find_breakers(self, df: pd.DataFrame) -> list[BreakerBlock]:
+        """
+        Buzilgan Order Block larni (Breaker) qaytaradi.
+
+        OB close bilan qarama-qarshi chegaradan o'tsa — qutbi almashadi:
+          - Bullish OB pastga (close < bottom) buzilsa -> SELL breaker
+          - Bearish OB yuqoriga (close > top) buzilsa   -> BUY breaker
+        """
+        closes = df["close"].to_numpy()
+        highs = df["high"].to_numpy()
+        lows = df["low"].to_numpy()
+        times = df.index
+        breakers: list[BreakerBlock] = []
+
+        for b in self.find(df):
+            fut = range(b.index + 1, len(df))
+            break_idx: int | None = None
+            for k in fut:
+                if b.direction == Direction.BUY and closes[k] < b.bottom:
+                    break_idx = k
+                    break
+                if b.direction == Direction.SELL and closes[k] > b.top:
+                    break_idx = k
+                    break
+            if break_idx is None:
+                continue
+
+            flipped = Direction.SELL if b.direction == Direction.BUY else Direction.BUY
+            # buzilishdan keyin narx zonaga qaytib keldimi (retest)?
+            retested = False
+            for k in range(break_idx + 1, len(df)):
+                if lows[k] <= b.top and highs[k] >= b.bottom:
+                    retested = True
+                    break
+            breakers.append(
+                BreakerBlock(
+                    direction=flipped,
+                    top=b.top,
+                    bottom=b.bottom,
+                    index=break_idx,
+                    time=times[break_idx],
+                    retested=retested,
+                )
+            )
+        return breakers
