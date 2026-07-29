@@ -83,8 +83,14 @@ class FusionResult:
 class FusionEngine:
     """Strategiyalarni birlashtirib yakuniy signal chiqaradi."""
 
-    def __init__(self, risk_reward: float = DEFAULT_RR) -> None:
+    def __init__(
+        self,
+        risk_reward: float = DEFAULT_RR,
+        disabled: set[str] | None = None,
+    ) -> None:
         self.risk_reward = risk_reward
+        # disabled — o'chirilgan ovozlar (A/B test uchun; ular WAIT ga majburlanadi)
+        self.disabled = disabled or set()
         self.structure = StructureAnalyzer(lookback=2)
         self.order_block = OrderBlockAnalyzer()
         self.fvg = FVGAnalyzer()
@@ -251,6 +257,14 @@ class FusionEngine:
         pd_res = self.premium_discount.evaluate(df)
         votes.append(Vote("premium_discount", pd_res.direction, WEIGHTS["premium_discount"],
                           pd_res.confidence, pd_res.reason))
+
+        # A/B test: o'chirilgan ovozlarni WAIT ga majburlash (ballarga qo'shilmaydi)
+        if self.disabled:
+            for v in votes:
+                if v.strategy in self.disabled:
+                    v.direction = Direction.WAIT
+                    v.confidence = 0
+                    v.reason = f"[o'chirilgan] {v.reason}"
 
         return votes
 
