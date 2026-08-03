@@ -87,6 +87,8 @@ class TitanOrchestrator:
             for tf in self.timeframes:
                 try:
                     info = self.feed.get_symbol_info(symbol)
+                    # Faqat YOPILGAN shamlar (include_forming=False default) —
+                    # backtest bilan bir xil, aks holда repaint bo'ladi.
                     df = self.feed.get_candles(symbol, tf, count=200)
                     # Yuqori taymfrejm konfluensi (MTF) uchun HTF shamlar
                     htf_tf = higher_timeframe(tf)

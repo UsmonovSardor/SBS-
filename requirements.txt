@@ -3,8 +3,15 @@
 # O'rnatish:  pip install -r requirements.txt
 # ============================================================
 
-# --- MetaTrader 5 (faqat Windows) ---
+# --- MetaTrader 5 (faqat Windows nativ rejim) ---
+# Linux/Docker'да o'rnatilmaydi — deploy/Dockerfile buni chiqarib tashlaydi,
+# uning o'rniga mt5linux ko'prigi ishlaydi (MT5_HOST env berilganда).
 MetaTrader5==5.0.45
+
+# --- MT5 Linux ko'prigi (Docker/VPS: Wine ichidagi MT5 serverга RPyC) ---
+# mt5linux o'zi mos rpyc (<7,>=6) ni tortadi. Agar ulanишда RPyC protokol
+# mos kelmasa — server (gmag11 image) va klient rpyc versiyasini tenglang.
+mt5linux==1.0.11
 
 # --- Ma'lumotlar tahlili ---
 pandas==2.2.2

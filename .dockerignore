@@ -1,0 +1,12 @@
+# Docker build konteksti uchun (git'ga ta'sir qilmaydi)
+.git
+deploy/mt5-config
+deploy/.env
+.env
+**/__pycache__
+*.pyc
+.venv
+venv
+docs
+tests
+scripts/*.bat

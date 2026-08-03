@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import MetaTrader5 as mt5
+from app.market.mt5_client import mt5
 
 from app.core.config import settings
 from app.core.constants import (

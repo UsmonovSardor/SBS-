@@ -1,0 +1,51 @@
+# TITAN AI — Linux VPS (Docker) deploy.
+# Ishga tushirish (repo ildizidan):  cd deploy && cp .env.example .env && nano .env
+#                                     docker compose up -d --build
+services:
+  # ── MT5 terminal + RPyC ko'prigi (Wine + KasmVNC) ───────────────────────
+  # gmag11 image: MT5 ni avtomatik yuklab, RPyC serverni port 8001'да ko'taradi.
+  mt5:
+    image: gmag11/metatrader5_vnc
+    container_name: mt5
+    restart: unless-stopped
+    volumes:
+      - ./mt5-config:/config          # MT5 profil/login/chartlar (persistent)
+    environment:
+      - CUSTOM_USER=${VNC_USER}
+      - PASSWORD=${VNC_PASSWORD}
+    ports:
+      # VNC faqat LOKALGA — internetга OCHILMAYDI. SSH tunnel bilan kirasiz:
+      #   ssh -L 3000:localhost:3000 ubuntu@<VPS_IP>   →   http://localhost:3000
+      - "127.0.0.1:3000:3000"
+      # DIQQAT: 8001 (RPyC) ATAY publish QILINMAGAN. Bot uni ichki docker
+      # tarmog'idan "mt5:8001" deb ko'radi. Tashqариga chiqarish = xavf.
+    networks:
+      - mt5net
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 8001 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 300s          # birinchi ishga tushishда MT5 o'rnatiladi (~2-5 daq)
+
+  # ── Bot ──────────────────────────────────────────────────────────────────
+  bot:
+    build:
+      context: ..                 # repo ildizi
+      dockerfile: deploy/Dockerfile
+    container_name: mt5bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - MT5_HOST=mt5              # botga MT5 ko'prigi manzili
+      - MT5_PORT=8001
+    depends_on:
+      mt5:
+        condition: service_healthy
+    networks:
+      - mt5net
+
+networks:
+  mt5net:
+    driver: bridge

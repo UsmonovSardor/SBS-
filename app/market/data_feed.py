@@ -8,8 +8,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import MetaTrader5 as mt5
 import pandas as pd
+
+from app.market.mt5_client import mt5
 
 from app.core.constants import Timeframe
 from app.core.exceptions import MarketDataError
@@ -118,16 +119,26 @@ class DataFeed:
         symbol: str,
         timeframe: Timeframe = Timeframe.M15,
         count: int = 300,
+        include_forming: bool = False,
     ) -> pd.DataFrame:
         """
         Oxirgi `count` ta shamni DataFrame ko'rinishida qaytaradi.
 
         Ustunlar: time (index), open, high, low, close, tick_volume, spread, real_volume
+
+        include_forming:
+            False (default) — faqat YOPILGAN shamlar (start_pos=1). Tahlil/signal
+              shu rejimда bo'lishi SHART: backtest ham faqat yopilgan shamда
+              ishlaydi, aks holда live "repaint" bo'lib backtest bilan mos kelmaydi.
+            True — oxirgi (shakllanayotgan) sham ham qo'shiladi. Faqat live
+              narxни ko'rsatish/charting uchun; signal tahlilida ISHLATILMAYDI.
         """
         self.ensure_symbol(symbol)
         mt5_tf = TIMEFRAME_MAP[timeframe]
 
-        rates = mt5.copy_rates_from_pos(symbol, mt5_tf, 0, count)
+        # start_pos=0 -> hozirgi (yopilmagan) sham; =1 -> oxirgi YOPILGAN shamдан boshlab
+        start_pos = 0 if include_forming else 1
+        rates = mt5.copy_rates_from_pos(symbol, mt5_tf, start_pos, count)
         if rates is None or len(rates) == 0:
             code, desc = mt5.last_error()
             raise MarketDataError(
