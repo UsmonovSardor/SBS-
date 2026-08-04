@@ -11,7 +11,13 @@ MetaTrader5==5.0.45
 # --- MT5 Linux ko'prigi (Docker/VPS: Wine ichidagi MT5 serverга RPyC) ---
 # mt5linux o'zi mos rpyc (<7,>=6) ni tortadi. Agar ulanишда RPyC protokol
 # mos kelmasa — server (gmag11 image) va klient rpyc versiyasini tenglang.
-mt5linux==1.0.11
+# DIQQAT: bot faqat mt5linux KLIENTINI ishlatadi va u SERVER (gmag11 mt5
+# konteyneri) bilan bir xil versiyada bo'lishi shart. gmag11 start.sh asl
+# lucas-campagna mt5linux'ni kutadi (-w wine python.exe CLI) = 0.1.9.
+# PyPI'dagi mt5linux 1.0.11/1.1.0 boshqa, mos kelmaydigan paket (1.1.0 py3.12
+# kerak). Shuning uchun mt5linux==0.1.9 deploy/Dockerfile'da --no-deps bilan
+# o'rnatiladi; bu yerda faqat klient uchun rpyc:
+rpyc>=6,<7
 
 # --- Ma'lumotlar tahlili ---
 pandas==2.2.2

@@ -1,0 +1,4 @@
+# Shell skriptlar va Dockerfile HAR DOIM LF bo'lishi shart — Linux konteyner
+# ichida CRLF ularni buzadi (bash: \r xatosi; LSIO /custom-cont-init.d).
+*.sh text eol=lf
+Dockerfile text eol=lf

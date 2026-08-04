@@ -10,6 +10,9 @@ services:
     restart: unless-stopped
     volumes:
       - ./mt5-config:/config          # MT5 profil/login/chartlar (persistent)
+      # gmag11 start.sh ni py3.11 mos qiladi (mt5linux==0.1.9 + wine numpy<2).
+      # LSIO init'da start.sh'dan OLDIN ishlaydi — fresh deploy uchun shart.
+      - ./mt5-init:/custom-cont-init.d:ro
     environment:
       - CUSTOM_USER=${VNC_USER}
       - PASSWORD=${VNC_PASSWORD}
