@@ -39,6 +39,7 @@ from app.strategies import (
     MomentumStrategy,
     PremiumDiscountStrategy,
     RegimeDetector,
+    VolumeStrategy,
     current_session,
 )
 
@@ -90,6 +91,8 @@ class FusionEngine:
         disabled: set[str] | None = None,
         adaptive_weights: bool = False,
         weights_override: dict[str, int] | None = None,
+        volume_filter: bool = False,
+        min_confidence: float | None = None,
     ) -> None:
         self.risk_reward = risk_reward
         # disabled — o'chirilgan ovozlar (A/B test uchun; ular WAIT ga majburlanadi)
@@ -108,6 +111,11 @@ class FusionEngine:
         self.premium_discount = PremiumDiscountStrategy()
         self.htf_bias = HtfBias()
         self.regime_detector = RegimeDetector()
+        # volume_filter — Volume Engine (7-bob) bilan fake-breakout signallarni rad etish.
+        self.volume_filter = volume_filter
+        self.volume = VolumeStrategy()
+        # min_confidence — signal chegarasi (Elite selektivlik uchun; None = standart 60).
+        self.min_confidence = min_confidence if min_confidence is not None else CONFIDENCE_MIN_SIGNAL
 
     # ------------------------------------------------------------------ #
     #  Asosiy: DataFrame -> Signal (yoki None, agar WAIT bo'lsa)
@@ -161,8 +169,8 @@ class FusionEngine:
         if direction == Direction.WAIT:
             result.wait_reason = "buy va sell ballari teng"
             return result
-        if confidence < CONFIDENCE_MIN_SIGNAL:
-            result.wait_reason = f"confidence past ({confidence}% < {CONFIDENCE_MIN_SIGNAL}%)"
+        if confidence < self.min_confidence:
+            result.wait_reason = f"confidence past ({confidence}% < {self.min_confidence}%)"
             return result
 
         entry, sl, tp = self._calc_levels(direction, price, struct, avg_range, digits)
@@ -178,6 +186,14 @@ class FusionEngine:
             )
             log.debug(f"{symbol} {timeframe}: {result.wait_reason}")
             return result
+
+        # Volume tasdiqlash filtri (7-bob): fake-breakout (hajmsiz) signalni rad etadi
+        if self.volume_filter:
+            ok, vreason = self.volume.confirms(df, direction)
+            if not ok:
+                result.wait_reason = f"volume: {vreason}"
+                log.debug(f"{symbol} {timeframe}: {result.wait_reason}")
+                return result
 
         reasons = [f"{v.strategy}: {v.reason}" for v in votes if v.direction == direction]
         reasons.append(f"session: {session.name} (confidence x{session.factor})")

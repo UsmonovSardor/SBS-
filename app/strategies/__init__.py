@@ -13,6 +13,7 @@ from app.strategies.regime import (
     WEIGHT_PROFILES,
 )
 from app.strategies.session import SessionInfo, current_session
+from app.strategies.volume import VolumeResult, VolumeState, VolumeStrategy
 
 __all__ = [
     "MomentumStrategy",
@@ -29,4 +30,7 @@ __all__ = [
     "RegimeDetector",
     "RegimeResult",
     "WEIGHT_PROFILES",
+    "VolumeStrategy",
+    "VolumeResult",
+    "VolumeState",
 ]
