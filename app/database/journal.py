@@ -71,7 +71,11 @@ class Journal:
     # ------------------------------------------------------------------ #
     #  Signal natijasini kuzatish (tracked_signals)
     # ------------------------------------------------------------------ #
-    def add_tracked(self, signal: Signal, message_id: int | None, digits: int) -> int:
+    def add_tracked(self, signal: Signal, message_id: int | None, digits: int,
+                    anchor_iso: str) -> int:
+        """anchor_iso — signal SHAMINING vaqti (broker/MT5 time). last_checked shu
+        vaqtdan boshlanadi, aks holда datetime.now() (konteyner UTC) broker vaqtidan
+        farq qilib, signaldan OLDINGI shamlar tekshirilib soxta TP/SL chiqadi."""
         with self._conn() as c:
             cur = c.execute(
                 """INSERT INTO tracked_signals
@@ -81,7 +85,7 @@ class Journal:
                 (signal.symbol, signal.timeframe, signal.direction.value, digits,
                  signal.entry, signal.stop_loss, signal.tp1, signal.tp2, signal.tp3,
                  message_id, signal.stop_loss,
-                 signal.created_at.isoformat(), signal.created_at.isoformat()),
+                 anchor_iso, signal.created_at.isoformat()),
             )
             return cur.lastrowid
 

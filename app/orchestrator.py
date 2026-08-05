@@ -160,10 +160,14 @@ class TitanOrchestrator:
                     message_id = await self.tgbot.send_signal(signal, chart, signal_db_id=db_id)
                     log.info(f"📤 Yangi signal yuborildi: {signal.summary()}")
 
-                    # Signal natijasini kuzatishga ro'yxat (TP1/TP2/TP3/SL follow-up)
+                    # Signal natijasini kuzatishga ro'yxat (TP1/TP2/TP3/SL follow-up).
+                    # anchor = signal SHAMINING vaqti (broker/MT5 time) — kuzatuv faqat
+                    # shundan KEYINGI shamlarni tekshiradi (soxta TP/SL bo'lmasin).
                     if settings.signal_tracking:
+                        anchor_iso = df.index[-1].isoformat()
                         await asyncio.to_thread(
-                            self.journal.add_tracked, signal, message_id, signal.digits)
+                            self.journal.add_tracked, signal, message_id,
+                            signal.digits, anchor_iso)
 
                     # AUTO_TRADE yoqilgan bo'lsa — tugmasiz avtomatik savdo
                     if settings.auto_trade:
