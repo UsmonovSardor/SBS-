@@ -83,6 +83,14 @@ Ulanишни tekshirish:
 docker compose exec bot python -c "from app.market.mt5_client import mt5; print(mt5.version())"
 ```
 
+**Persistent data:** bot `data/titan.db` (signal jurnali + kuzatuvdаги signallar)
+`./bot-data` bind-mount'да saqlanаdi → `docker compose build/up` (rebuild) tracked
+signallarни YO'QOTMAYDI. Fresh deploy'да `bot-data/` bo'sh yaratiladi (normal).
+Eski konteynerdаги DB'ни ko'chirib olish (bir martalik migratsiya):
+```bash
+mkdir -p ~/mt5/deploy/bot-data && docker cp mt5bot:/app/data/titan.db ~/mt5/deploy/bot-data/titan.db
+```
+
 ---
 
 ## 8. VNC bilan MT5'ни ko'rish (login/chartlar)

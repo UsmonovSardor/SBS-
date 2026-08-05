@@ -40,6 +40,12 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    volumes:
+      # Signal jurnali + kuzatuvdagi signallar (data/titan.db) PERSISTENT bo'lsin.
+      # Aks holda `docker compose build/up` konteynerni qayta yaratganда tracked
+      # signallar (BE/TP/SL state-machine) va jurnal YO'QOLADI. Host'даги
+      # ./bot-data rebuild'дан omon qoladi. (mt5-config bilan bir xil naqsh.)
+      - ./bot-data:/app/data
     environment:
       - MT5_HOST=mt5              # botga MT5 ko'prigi manzili
       - MT5_PORT=8001

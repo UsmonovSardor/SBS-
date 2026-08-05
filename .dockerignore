@@ -1,6 +1,7 @@
 # Docker build konteksti uchun (git'ga ta'sir qilmaydi)
 .git
 deploy/mt5-config
+deploy/bot-data
 deploy/.env
 .env
 **/__pycache__

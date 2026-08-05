@@ -58,6 +58,10 @@ data/*.db
 data/*.sqlite
 *.log
 
+# Docker bind-mount runtime papkalari (faqat serverda, hech qachon commit emas)
+deploy/bot-data/
+deploy/mt5-config/
+
 # --- Grafiklar (vaqtinchalik) ---
 charts/
 *.png
