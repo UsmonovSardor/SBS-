@@ -7,7 +7,10 @@ konsensus asosida yagona signal chiqaradi.
 
 Faol ovoz beruvchilar (vazn manbai: constants.ACTIVE_WEIGHTS, jami = 100):
   trend, structure (BOS/CHoCH/MSS), order_block (+Breaker), fvg (+Inverse),
-  liquidity, momentum, htf_bias (MTF konfluens), premium_discount (equilibrium).
+  liquidity, momentum, premium_discount (equilibrium).
+
+Eslatma: htf_bias (MTF) ovozi olib tashlangan — keng validatsiyada zararli
+chiqdi (docs/EDGE_ANALYSIS.md).
 """
 from __future__ import annotations
 
@@ -35,7 +38,6 @@ from app.smc import (
     StructureAnalyzer,
 )
 from app.strategies import (
-    HtfBias,
     MomentumStrategy,
     PremiumDiscountStrategy,
     RegimeDetector,
@@ -109,7 +111,6 @@ class FusionEngine:
         self.liquidity = LiquidityAnalyzer()
         self.momentum = MomentumStrategy()
         self.premium_discount = PremiumDiscountStrategy()
-        self.htf_bias = HtfBias()
         self.regime_detector = RegimeDetector()
         # volume_filter — Volume Engine (7-bob) bilan fake-breakout signallarni rad etish.
         self.volume_filter = volume_filter
@@ -127,7 +128,6 @@ class FusionEngine:
         timeframe: str,
         digits: int = 5,
         now: datetime | None = None,
-        htf_df: pd.DataFrame | None = None,
     ) -> FusionResult:
         price = float(df["close"].iloc[-1])
         avg_range = float((df["high"] - df["low"]).mean()) or 1e-9
@@ -140,7 +140,7 @@ class FusionEngine:
             weights = self.weights_override or WEIGHTS
 
         struct = self.structure.analyze(df)
-        votes = self._collect_votes(df, price, avg_range, struct, htf_df, weights)
+        votes = self._collect_votes(df, price, avg_range, struct, weights)
 
         buy_score = sum(v.weight for v in votes if v.direction == Direction.BUY)
         sell_score = sum(v.weight for v in votes if v.direction == Direction.SELL)
@@ -219,7 +219,7 @@ class FusionEngine:
     # ------------------------------------------------------------------ #
     #  Ovozlarni yig'ish
     # ------------------------------------------------------------------ #
-    def _collect_votes(self, df, price, avg_range, struct, htf_df=None,
+    def _collect_votes(self, df, price, avg_range, struct,
                        weights=WEIGHTS) -> list[Vote]:
         votes: list[Vote] = []
 
@@ -282,12 +282,7 @@ class FusionEngine:
         votes.append(Vote("momentum", mom.direction, weights["momentum"],
                           mom.confidence, mom.reason))
 
-        # 7) HTF BIAS (yuqori taymfrejm konfluensi)
-        htf = self.htf_bias.evaluate(htf_df)
-        votes.append(Vote("htf_bias", htf.direction, weights["htf_bias"],
-                          htf.confidence, htf.reason))
-
-        # 8) PREMIUM / DISCOUNT (equilibrium)
+        # 7) PREMIUM / DISCOUNT (equilibrium)
         pd_res = self.premium_discount.evaluate(df)
         votes.append(Vote("premium_discount", pd_res.direction, weights["premium_discount"],
                           pd_res.confidence, pd_res.reason))

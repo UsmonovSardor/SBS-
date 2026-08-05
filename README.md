@@ -4,7 +4,9 @@
 
 Bot real-time bozorni tahlil qiladi, Smart Money Concepts (SMC/ICT) va boshqa strategiyalar asosida signal generatsiya qiladi, uni **grafik + tushuntirish** bilan Telegram kanalga yuboradi. Har signal tagida **🟢 Auto-Trade** tugmasi bo'lib, bosilganda MT5 account'da avtomatik savdo ochadi (Take Profit / Stop Loss bilan).
 
-> ⚠️ **Ogohlantirish:** Bu dastur ta'lim va tadqiqot maqsadida. Savdo katta moliyaviy risk. Hozircha faqat **DEMO account**'da ishlaydi. Bu litsenziyalangan moliyaviy maslahat emas.
+> ⚠️ **Ogohlantirish:** Bu dastur **ta'lim va tadqiqot** maqsadida — **signal/alert vositasi**, foydali auto-trader emas.
+>
+> 🔬 **Halol natija:** Keng validatsiya (12 simvol × 4 yil, walk-forward) shuni ko'rsatdiki, strategiyaning SMC-fusion yondashuvi H4'da **statistik ishonchli edge bermaydi** (natija ~tanga tashlash). Batafsil: [docs/EDGE_ANALYSIS.md](docs/EDGE_ANALYSIS.md). **Real pulda ishlatilmasin.** Bu litsenziyalangan moliyaviy maslahat emas.
 
 ---
 
@@ -113,12 +115,19 @@ python main.py
 - [x] Backtesting engine (walk-forward)
 - [x] Deploy qo'llanma (Windows VPS, [docs/DEPLOY.md](docs/DEPLOY.md))
 
-### 🔮 Faza 3+ (kelajak)
-- [ ] Strategiyani optimallashtirish (backtest asosida tuning)
-- [ ] Harmonic / Elliott / Wyckoff (murakkab pattern'lar)
-- [ ] PostgreSQL + Redis (enterprise miqyos)
-- [ ] AI self-learning / optimization
-- [ ] Linux + MetaApi (bulut deploy)
+### ✅ Faza F — Edge validatsiya (halol o'lchov) — TUGADI
+- [x] Windowssiz Linux + Docker deploy (Contabo VPS, gmag11 MT5 ko'prigi)
+- [x] Skaner robustligi (hang'da avto-restart + heartbeat)
+- [x] HTF-aware backtester + Market Regime tizimi (39/14-bob, off-by-default)
+- [x] Volume Engine (7-bob, off-by-default)
+- [x] **Keng validatsiya: 12 simvol × 4 yil walk-forward** → [docs/EDGE_ANALYSIS.md](docs/EDGE_ANALYSIS.md)
+- [x] **Natija: ishonchli edge YO'Q** → botni signal/ta'lim vositasi sifatida qabul qilish
+- [x] `htf_bias` (zararli ~36R) olib tashlandi
+
+### 🔮 Kelajak (agar edge qidirilsa — natija kafolatlanmagan)
+- [ ] Xarajat/RR muammosini hal qilish (kattaroq RR, kam-spread filtri)
+- [ ] Butunlay boshqa metodologiya (voting o'rniga) — SMC-fusion foydali chiqmadi
+- [ ] ICT/Wyckoff/Elliott/Harmonic — **eslatma:** ko'proq ovoz edge yaratmaydi (EDGE_ANALYSIS.md)
 
 ---
 

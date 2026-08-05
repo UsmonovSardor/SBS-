@@ -6,7 +6,7 @@ Manba: TITAN AI TRADING BIBLE, 39-bob (Market Regime) + 14-bob (Strategy Selecto
 Institutsional mantiq: bozor har doim bir xil emas. Ba'zan kuchli TREND, ba'zan
 RANGE (yon harakat). Strategiyalar bir vaqtda emas — REJIMGA qarab prioritet
 oladi:
-  • TREND rejimida: trend / structure / htf_bias / momentum ustun ("trend bilan").
+  • TREND rejimida: trend / structure / momentum ustun ("trend bilan").
   • RANGE rejimida: liquidity / premium_discount / order_block / fvg ustun
     (reversal — sweep'dan qaytish, equilibrium'dan qaytish).
 
@@ -47,24 +47,22 @@ ER_LOOKBACK = 24  # nechta shamda yo'nalishlilikni o'lchash (H4'da ~4 kun)
 # --- Har rejim uchun vazn profili (jami = 100) ---
 # Kalitlar constants.ACTIVE_WEIGHTS bilan bir xil (8 ovoz).
 _TRENDING_WEIGHTS: dict[str, int] = {
-    "trend": 17,             # trend ovozlari ustun
-    "structure": 16,
-    "htf_bias": 14,          # trend rejimida HTF konfluensi FOYDALI
-    "momentum": 12,
-    "order_block": 12,
-    "fvg": 8,
-    "liquidity": 11,
-    "premium_discount": 10,
+    "trend": 20,             # trend ovozlari ustun
+    "structure": 19,
+    "momentum": 14,
+    "order_block": 14,
+    "fvg": 9,
+    "liquidity": 13,
+    "premium_discount": 11,
 }
 _RANGING_WEIGHTS: dict[str, int] = {
-    "liquidity": 18,         # range'da sweep/reversal ustun
-    "premium_discount": 16,  # equilibrium'dan qaytish
-    "order_block": 16,
-    "fvg": 12,
-    "structure": 14,
-    "trend": 8,              # range'da trend ovozi zaif
-    "momentum": 8,
-    "htf_bias": 8,           # range'da HTF-trend filtri ZARARLI -> past vazn
+    "liquidity": 20,         # range'da sweep/reversal ustun
+    "premium_discount": 17,  # equilibrium'dan qaytish
+    "order_block": 17,
+    "fvg": 13,
+    "structure": 15,
+    "trend": 9,              # range'da trend ovozi zaif
+    "momentum": 9,
 }
 
 WEIGHT_PROFILES: dict[MarketRegime, dict[str, int]] = {

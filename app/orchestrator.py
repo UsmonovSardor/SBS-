@@ -30,7 +30,6 @@ from app.database import Journal
 from app.execution import PositionMonitor, TradeExecutor
 from app.market import DataFeed, MT5Connector
 from app.smc import FVGAnalyzer, OrderBlockAnalyzer
-from app.strategies import higher_timeframe
 from app.telegram import TitanTelegramBot
 
 
@@ -92,14 +91,8 @@ class TitanOrchestrator:
                     # Faqat YOPILGAN shamlar (include_forming=False default) —
                     # backtest bilan bir xil, aks holда repaint bo'ladi.
                     df = self.feed.get_candles(symbol, tf, count=200)
-                    # Yuqori taymfrejm konfluensi (MTF) uchun HTF shamlar
-                    htf_tf = higher_timeframe(tf)
-                    htf_df = (
-                        self.feed.get_candles(symbol, htf_tf, count=200)
-                        if htf_tf != tf else None
-                    )
                     res = self.engine.analyze(
-                        df, symbol, tf.value, digits=info.digits, htf_df=htf_df
+                        df, symbol, tf.value, digits=info.digits
                     )
                     if res.is_signal:
                         candle_time = df.index[-1]

@@ -165,23 +165,12 @@ class Backtester:
         self.commission = commission
 
     def run(self, df: pd.DataFrame, symbol: str, timeframe: str,
-            digits: int = 5, htf_df: pd.DataFrame | None = None) -> BacktestResult:
-        """
-        htf_df — yuqori taymfrejm (masalan H4 uchun D1) shamlari. Berilса, har
-        barда FAQAT o'sha lahzagacha YOPILGAN HTF shamlar uzatiladi (jonli
-        bot `include_forming=False` bilan bir xil — repaint yo'q). Shu tariqa
-        htf_bias ovozi ham backtestда jonli konfiguratsiyadagidek sinaladi.
-        """
+            digits: int = 5) -> BacktestResult:
         result = BacktestResult(symbol=symbol, timeframe=timeframe)
         highs = df["high"].to_numpy()
         lows = df["low"].to_numpy()
         times = df.index
         n = len(df)
-
-        # HTF sham davomiyligi (bir sham qachon "yopiladi" ni bilish uchun)
-        htf_freq = None
-        if htf_df is not None and len(htf_df) > 1:
-            htf_freq = htf_df.index.to_series().diff().dropna().median()
 
         open_trade: BacktestTrade | None = None
         i = self.warmup
@@ -195,13 +184,8 @@ class Backtester:
                 continue
 
             window_df = df.iloc[max(0, i - self.window): i + 1]
-            # Faqat shu bardan oldin to'liq yopilgan HTF shamlar (repaint yo'q)
-            htf_window = None
-            if htf_freq is not None:
-                closed = htf_df[htf_df.index + htf_freq <= times[i]]
-                htf_window = closed if len(closed) >= 10 else None
             res = self.engine.analyze(window_df, symbol, timeframe, digits=digits,
-                                      now=times[i].to_pydatetime(), htf_df=htf_window)
+                                      now=times[i].to_pydatetime())
             if res.is_signal:
                 s = res.signal
                 open_trade = BacktestTrade(

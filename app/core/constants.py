@@ -45,17 +45,20 @@ class SignalStrength(str, Enum):
 # Manba: TITAN AI TRADING BIBLE, 40-bob (Multi-Strategy Fusion).
 # MUHIM: bu — Fusion Engine amalda ISHLATADIGAN yagona vazn manbasi.
 # Har bir kalit `fusion_engine._collect_votes` dagi bitta ovozga mos keladi.
-# (Wyckoff/Elliott/Harmonic/News hali qurilmagan — ular Faza C da qo'shiladi va
-#  o'shanda bu jadval qayta muvozanatlanadi.)
+#
+# ESLATMA (2026-08-05): htf_bias (MTF konfluens) OVOZI OLIB TASHLANDI. Keng
+# validatsiya (12 simvol × 4 yil, walk-forward) htf_bias ovozi natijani
+# barqaror ~36R yomonlashtirishini ko'rsatdi (blunt HTF-trend filtri SMC
+# reversal setuplariga zid). Uning vazni qolgan 7 ovozga proporsional
+# taqsimlandi. Batafsil: docs/EDGE_ANALYSIS.md.
 ACTIVE_WEIGHTS: dict[str, int] = {
-    "trend": 14,            # bozor trendi (HH/HL yoki LH/LL)
-    "structure": 15,        # BOS / CHoCH / MSS
-    "order_block": 13,      # Order Block + Breaker Block zonalari
-    "fvg": 10,              # Fair Value Gap + Inverse FVG
-    "liquidity": 14,        # Equal H/L sweep
-    "momentum": 9,          # EMA momentum
-    "htf_bias": 15,         # yuqori taymfrejm trend konfluensi (MTF)
-    "premium_discount": 10,  # equilibrium (faqat discountda BUY, premiumda SELL)
+    "trend": 16,            # bozor trendi (HH/HL yoki LH/LL)
+    "structure": 18,        # BOS / CHoCH / MSS
+    "order_block": 15,      # Order Block + Breaker Block zonalari
+    "fvg": 12,              # Fair Value Gap + Inverse FVG
+    "liquidity": 16,        # Equal H/L sweep
+    "momentum": 11,         # EMA momentum
+    "premium_discount": 12,  # equilibrium (faqat discountda BUY, premiumda SELL)
 }
 assert sum(ACTIVE_WEIGHTS.values()) == 100, "ACTIVE_WEIGHTS jami 100 bo'lishi shart"
 

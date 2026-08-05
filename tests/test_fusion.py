@@ -19,10 +19,9 @@ def test_all_votes_present():
     assert strategies == set(ACTIVE_WEIGHTS.keys())
 
 
-def test_analyze_returns_result_and_runs_with_htf():
+def test_analyze_returns_result():
     df = df_from_closes(zigzag([10, 12, 11, 13, 12.5, 15], steps=10))
-    htf = df_from_closes(zigzag([9, 11, 10, 13], steps=10))
-    res = FusionEngine().analyze(df, "TEST", "M15", digits=3, htf_df=htf)
+    res = FusionEngine().analyze(df, "TEST", "M15", digits=3)
     assert isinstance(res, FusionResult)
     assert 0 <= res.confidence <= 100
 
