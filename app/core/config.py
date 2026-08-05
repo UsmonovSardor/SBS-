@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     scan_timeframes: str = Field(default="M5,M15,H1", alias="SCAN_TIMEFRAMES")
     auto_trade: bool = Field(default=False, alias="AUTO_TRADE")             # signal kelishi bilan avtomatik savdo (tugmasiz)
     min_sl_atr_ratio: float = Field(default=0.6, alias="MIN_SL_ATR_RATIO")  # SL kamida shu marta o'rtacha shamdan uzoq bo'lsin (sifat filtri)
+    scan_hard_timeout: int = Field(default=90, alias="SCAN_HARD_TIMEOUT")   # bitta skan tsikli shu soniyada javob bermasa = ko'prik muzlagan -> jarayon qayta ishga tushadi
 
     # --- Pozitsiya monitoringi (trailing / break-even) ---
     position_manage: bool = Field(default=True, alias="POSITION_MANAGE")       # BE/trailing yoqilganmi

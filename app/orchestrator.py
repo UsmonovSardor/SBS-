@@ -13,6 +13,8 @@ Ikki vazifa parallel: scanner_loop() va Telegram polling (asyncio.gather).
 from __future__ import annotations
 
 import asyncio
+import os
+import time
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -105,7 +107,9 @@ class TitanOrchestrator:
                             self.tracker.mark(res.signal, candle_time)
                             new_signals.append((res.signal, df))
                 except Exception as e:  # noqa: BLE001
-                    log.debug(f"{symbol} {tf.value}: {e}")
+                    # WARNING darajasida — jim qolib ketmasin (ilgari debug edi,
+                    # INFO logda ko'rinmagani uchun 6 soatlik uzilish sezilmagan).
+                    log.warning(f"{symbol} {tf.value} skanida xato: {e}")
         return new_signals
 
     def _build_zones(self, df: pd.DataFrame, price: float) -> list[Zone]:
@@ -126,7 +130,31 @@ class TitanOrchestrator:
     async def scanner_loop(self) -> None:
         while self.running:
             try:
-                new_signals = self._scan_sync()
+                # ★ _scan_sync() ichida MT5 ko'prigiga BLOKLOVCHI RPyC chaqiruvlari
+                # bor. Uni to'g'ridan-to'g'ri chaqirish event loop'ni (Telegram
+                # polling + monitor) muzlatib qo'yardi — 21:57 dagi tarmoq blipida
+                # ulanish yarim-ochiq bo'lib qolib, butun bot 6 soat jim turgan.
+                # Endi: alohida thread'da + qattiq timeout bilan. Timeout otilsa =
+                # ko'prik muzlagan -> jarayonni tugatamiz, Docker (restart:
+                # unless-stopped) toza konteyner ko'taradi (yangi RPyC ulanish,
+                # mt5 terminal konteyneri alohida — login saqlanadi).
+                t0 = time.monotonic()
+                try:
+                    new_signals = await asyncio.wait_for(
+                        asyncio.to_thread(self._scan_sync),
+                        timeout=settings.scan_hard_timeout,
+                    )
+                except asyncio.TimeoutError:
+                    log.error(
+                        f"⛔ Skan {settings.scan_hard_timeout}s ichida javob bermadi — "
+                        f"MT5 ko'prigi muzlagan. Jarayon qayta ishga tushirilmoqda "
+                        f"(Docker restart)."
+                    )
+                    os._exit(1)  # osilib qolgan thread'ni ham darrov to'xtatadi
+                log.info(
+                    f"🔄 Skan tugadi: {len(new_signals)} yangi signal "
+                    f"({time.monotonic() - t0:.1f}s)"
+                )
                 for signal, df in new_signals:
                     chart = self.renderer.render(df, signal, zones=self._build_zones(df, signal.price_at_signal))
                     # Grok tarmoq chaqiruvi — event loop'ni bloklamaslik uchun thread'da
