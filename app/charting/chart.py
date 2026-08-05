@@ -49,8 +49,9 @@ class ChartRenderer:
         df: pd.DataFrame,
         signal: Signal,
         zones: list[Zone] | None = None,
+        title: str | None = None,
     ) -> str:
-        """Grafik chizib, PNG fayl yo'lini qaytaradi."""
+        """Grafik chizib, PNG fayl yo'lini qaytaradi. title berilса sarlavha almashtiriladi."""
         data = df.tail(self.candles).copy()
         zones = zones or []
 
@@ -68,10 +69,13 @@ class ChartRenderer:
         )
 
         arrow = "▲ BUY" if signal.is_buy else "▼ SELL"
-        title = (
-            f"\n{signal.symbol}  {signal.timeframe}   {arrow}   "
-            f"conf {signal.confidence:.0f}% [{signal.strength.value}]   RR 1:{signal.risk_reward:.1f}"
-        )
+        if title is None:
+            title = (
+                f"\n{signal.symbol}  {signal.timeframe}   {arrow}   "
+                f"conf {signal.confidence:.0f}% [{signal.strength.value}]   RR 1:{signal.risk_reward:.1f}"
+            )
+        else:
+            title = f"\n{title}"
 
         fig, axes = mpf.plot(
             data,
@@ -86,10 +90,15 @@ class ChartRenderer:
         )
         ax = axes[0]
 
-        # --- Entry / SL / TP chiziqlari ---
+        # --- Entry / SL / TP1-2-3 chiziqlari ---
         self._hline(ax, signal.entry, "#2962ff", f"Entry {signal.entry}")
         self._hline(ax, signal.stop_loss, "#ef5350", f"SL {signal.stop_loss}")
-        self._hline(ax, signal.take_profit, "#26a69a", f"TP {signal.take_profit}")
+        if signal.tp1 and signal.tp2 and signal.tp3:
+            self._hline(ax, signal.tp1, "#66bb6a", f"TP1 {signal.tp1}")
+            self._hline(ax, signal.tp2, "#26a69a", f"TP2 {signal.tp2}")
+            self._hline(ax, signal.tp3, "#00897b", f"TP3 {signal.tp3}")
+        else:
+            self._hline(ax, signal.take_profit, "#26a69a", f"TP {signal.take_profit}")
 
         # --- Zonalar (OB / FVG) ---
         for z in zones:

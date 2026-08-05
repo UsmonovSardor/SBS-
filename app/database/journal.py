@@ -51,7 +51,65 @@ class Journal:
                     signal_id INTEGER
                 )
             """)
+            # Signal natijasini kuzatish (TP1/TP2/TP3/SL follow-up uchun)
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS tracked_signals (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    symbol TEXT, timeframe TEXT, direction TEXT, digits INTEGER,
+                    entry REAL, sl REAL, tp1 REAL, tp2 REAL, tp3 REAL,
+                    message_id INTEGER,
+                    stage INTEGER DEFAULT 0,       -- 0=ochiq, 1=TP1, 2=TP2 olindi
+                    eff_sl REAL,                   -- joriy (trailing) himoya stopi
+                    status TEXT DEFAULT 'OPEN',    -- OPEN | CLOSED
+                    result TEXT,
+                    last_checked TEXT,
+                    opened_at TEXT, closed_at TEXT
+                )
+            """)
         log.debug(f"Journal tayyor: {self.db}")
+
+    # ------------------------------------------------------------------ #
+    #  Signal natijasini kuzatish (tracked_signals)
+    # ------------------------------------------------------------------ #
+    def add_tracked(self, signal: Signal, message_id: int | None, digits: int) -> int:
+        with self._conn() as c:
+            cur = c.execute(
+                """INSERT INTO tracked_signals
+                   (symbol,timeframe,direction,digits,entry,sl,tp1,tp2,tp3,
+                    message_id,stage,eff_sl,status,last_checked,opened_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,0,?, 'OPEN', ?, ?)""",
+                (signal.symbol, signal.timeframe, signal.direction.value, digits,
+                 signal.entry, signal.stop_loss, signal.tp1, signal.tp2, signal.tp3,
+                 message_id, signal.stop_loss,
+                 signal.created_at.isoformat(), signal.created_at.isoformat()),
+            )
+            return cur.lastrowid
+
+    def active_tracked(self) -> list[sqlite3.Row]:
+        with self._conn() as c:
+            return c.execute(
+                "SELECT * FROM tracked_signals WHERE status='OPEN' ORDER BY id"
+            ).fetchall()
+
+    def update_tracked(self, tid: int, *, stage: int, eff_sl: float,
+                       last_checked: str) -> None:
+        with self._conn() as c:
+            c.execute(
+                "UPDATE tracked_signals SET stage=?, eff_sl=?, last_checked=? WHERE id=?",
+                (stage, eff_sl, last_checked, tid),
+            )
+
+    def touch_tracked(self, tid: int, last_checked: str) -> None:
+        with self._conn() as c:
+            c.execute("UPDATE tracked_signals SET last_checked=? WHERE id=?",
+                      (last_checked, tid))
+
+    def close_tracked(self, tid: int, result: str) -> None:
+        with self._conn() as c:
+            c.execute(
+                "UPDATE tracked_signals SET status='CLOSED', result=?, closed_at=? WHERE id=?",
+                (result, datetime.now().isoformat(), tid),
+            )
 
     # ------------------------------------------------------------------ #
     #  Yozish

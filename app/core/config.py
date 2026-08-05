@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     min_sl_atr_ratio: float = Field(default=0.6, alias="MIN_SL_ATR_RATIO")  # SL kamida shu marta o'rtacha shamdan uzoq bo'lsin (sifat filtri)
     scan_hard_timeout: int = Field(default=90, alias="SCAN_HARD_TIMEOUT")   # bitta skan tsikli shu soniyada javob bermasa = ko'prik muzlagan -> jarayon qayta ishga tushadi
 
+    # --- Signal natijasini kuzatish (TP1/TP2/TP3/SL follow-up) ---
+    signal_tracking: bool = Field(default=True, alias="SIGNAL_TRACKING")     # signal natijasini kuzatib follow-up yuborish
+    outcome_interval: int = Field(default=30, alias="OUTCOME_INTERVAL")      # kuzatuv tsikli oralig'i (soniya)
+
     # --- Pozitsiya monitoringi (trailing / break-even) ---
     position_manage: bool = Field(default=True, alias="POSITION_MANAGE")       # BE/trailing yoqilganmi
     monitor_interval: int = Field(default=15, alias="MONITOR_INTERVAL")        # ochiq savdolarni tekshirish oralig'i (soniya)

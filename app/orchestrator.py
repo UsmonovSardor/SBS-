@@ -31,6 +31,7 @@ from app.execution import PositionMonitor, TradeExecutor
 from app.market import DataFeed, MT5Connector
 from app.smc import FVGAnalyzer, OrderBlockAnalyzer
 from app.telegram import TitanTelegramBot
+from app.tracking import SignalOutcomeTracker
 
 
 class SignalTracker:
@@ -71,6 +72,9 @@ class TitanOrchestrator:
         self.tgbot = TitanTelegramBot(executor=self.executor, journal=self.journal)
         self.tracker = SignalTracker(settings.signal_cooldown_min)
         self.monitor = PositionMonitor(self.executor)
+        # Signal natijasini kuzatuvchi (TP1/TP2/TP3/SL follow-up)
+        self.outcome_tracker = SignalOutcomeTracker(
+            self.feed, self.journal, self.renderer, self.tgbot)
         self.ob = OrderBlockAnalyzer()
         self.fvg = FVGAnalyzer()
 
@@ -153,8 +157,13 @@ class TitanOrchestrator:
                     # Grok tarmoq chaqiruvi — event loop'ni bloklamaslik uchun thread'da
                     signal.ai_explanation = await asyncio.to_thread(self.grok.explain_signal, signal)
                     db_id = await asyncio.to_thread(self.journal.log_signal, signal)
-                    await self.tgbot.send_signal(signal, chart, signal_db_id=db_id)
+                    message_id = await self.tgbot.send_signal(signal, chart, signal_db_id=db_id)
                     log.info(f"📤 Yangi signal yuborildi: {signal.summary()}")
+
+                    # Signal natijasini kuzatishga ro'yxat (TP1/TP2/TP3/SL follow-up)
+                    if settings.signal_tracking:
+                        await asyncio.to_thread(
+                            self.journal.add_tracked, signal, message_id, signal.digits)
 
                     # AUTO_TRADE yoqilgan bo'lsa — tugmasiz avtomatik savdo
                     if settings.auto_trade:
@@ -183,6 +192,20 @@ class TitanOrchestrator:
                 log.error(f"Monitor tsikli xatoligi: {e}")
             await asyncio.sleep(settings.monitor_interval)
 
+    # ------------------------------------------------------------------ #
+    #  Signal natijasini kuzatish tsikli (TP1/TP2/TP3/SL follow-up)
+    # ------------------------------------------------------------------ #
+    async def outcome_loop(self) -> None:
+        if not settings.signal_tracking:
+            log.info("Signal natija kuzatuvi o'chirilgan (SIGNAL_TRACKING=false).")
+            return
+        while self.running:
+            try:
+                await self.outcome_tracker.check_all()
+            except Exception as e:  # noqa: BLE001
+                log.error(f"Kuzatuv tsikli xatoligi: {e}")
+            await asyncio.sleep(settings.outcome_interval)
+
     def _sync_journal(self) -> None:
         """MT5'da yopilgan savdolarni jurnalда 'closed' deb belgilaydi."""
         positions = [p for p in self.executor.positions() if p.magic == TITAN_MAGIC]
@@ -208,11 +231,12 @@ class TitanOrchestrator:
         log.info(f"  Telegram guruh: {settings.telegram_channel_id}")
         log.info("=" * 58)
 
-        # Telegram polling + skaner + monitoring parallel
+        # Telegram polling + skaner + monitoring + natija kuzatuvi parallel
         await asyncio.gather(
             self.tgbot.dp.start_polling(self.tgbot.bot),
             self.scanner_loop(),
             self.monitor_loop(),
+            self.outcome_loop(),
         )
 
     async def close(self) -> None:

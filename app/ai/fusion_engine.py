@@ -173,8 +173,8 @@ class FusionEngine:
             result.wait_reason = f"confidence past ({confidence}% < {self.min_confidence}%)"
             return result
 
-        entry, sl, tp = self._calc_levels(direction, price, struct, avg_range, digits)
-        if sl is None or tp is None:
+        entry, sl, tp1, tp2, tp3 = self._calc_levels(direction, price, struct, avg_range, digits)
+        if sl is None or tp2 is None:
             result.wait_reason = "SL/TP hisoblanmadi"
             return result
 
@@ -205,11 +205,15 @@ class FusionEngine:
             strength=self._strength(confidence),
             entry=entry,
             stop_loss=sl,
-            take_profit=tp,
+            take_profit=tp2,
+            tp1=tp1,
+            tp2=tp2,
+            tp3=tp3,
             risk_reward=self.risk_reward,
             price_at_signal=round(price, digits),
             buy_score=buy_score,
             sell_score=sell_score,
+            digits=digits,
             votes=votes,
             reasons=reasons,
         )
@@ -332,6 +336,7 @@ class FusionEngine:
     #  Entry / Stop Loss / Take Profit
     # ------------------------------------------------------------------ #
     def _calc_levels(self, direction, price, struct, avg_range, digits):
+        """(entry, sl, tp1, tp2, tp3) qaytaradi. TP1=1R, TP2=2R, TP3=3R."""
         buffer = 0.3 * avg_range
         entry = round(price, digits)
 
@@ -339,17 +344,21 @@ class FusionEngine:
             lows = [s.price for s in struct.swing_lows if s.price < price]
             sl_raw = (max(lows) if lows else price - 1.5 * avg_range) - buffer
             sl = round(sl_raw, digits)
-            tp = round(entry + self.risk_reward * (entry - sl), digits)
+            sign = 1
         else:  # SELL
             highs = [s.price for s in struct.swing_highs if s.price > price]
             sl_raw = (min(highs) if highs else price + 1.5 * avg_range) + buffer
             sl = round(sl_raw, digits)
-            tp = round(entry - self.risk_reward * (sl - entry), digits)
+            sign = -1
 
         # SL entry bilan bir xil bo'lib qolsa — signal bekor
         if sl == entry:
-            return entry, None, None
-        return entry, sl, tp
+            return entry, None, None, None, None
+        risk = abs(entry - sl)
+        tp1 = round(entry + sign * 1 * risk, digits)
+        tp2 = round(entry + sign * 2 * risk, digits)
+        tp3 = round(entry + sign * 3 * risk, digits)
+        return entry, sl, tp1, tp2, tp3
 
     # ------------------------------------------------------------------ #
     @staticmethod

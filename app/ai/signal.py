@@ -37,12 +37,18 @@ class Signal:
 
     entry: float
     stop_loss: float
-    take_profit: float
+    take_profit: float                # = tp2 (asosiy maqsad, orqaga moslik + Auto-Trade)
     risk_reward: float
 
     price_at_signal: float
     buy_score: float
     sell_score: float
+
+    # Uch bosqichli maqsad (partial close uchun; TP1=1R, TP2=2R, TP3=3R)
+    tp1: float = 0.0
+    tp2: float = 0.0
+    tp3: float = 0.0
+    digits: int = 5                   # narx aniqligi (kuzatuv/formatlash uchun)
 
     votes: list[Vote] = field(default_factory=list)
     reasons: list[str] = field(default_factory=list)

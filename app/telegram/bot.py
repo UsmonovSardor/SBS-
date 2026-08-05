@@ -58,13 +58,13 @@ class TitanTelegramBot:
     #  Signalni yuborish
     # ------------------------------------------------------------------ #
     async def send_signal(self, signal: Signal, chart_path: str,
-                          signal_db_id: int | None = None) -> str:
-        """Signalni kanalga yuboradi. Signal_id qaytaradi."""
+                          signal_db_id: int | None = None) -> int | None:
+        """Signalni kanalga yuboradi. Telegram message_id qaytaradi (follow-up uchun)."""
         signal_id = uuid.uuid4().hex[:12]
         self.pending[signal_id] = (signal, signal_db_id)
 
         caption = self._format_caption(signal)
-        await self.bot.send_photo(
+        msg = await self.bot.send_photo(
             chat_id=settings.telegram_channel_id,
             photo=FSInputFile(chart_path),
             caption=caption,
@@ -72,7 +72,37 @@ class TitanTelegramBot:
             reply_markup=signal_keyboard(signal_id),
         )
         log.info(f"Signal Telegram'ga yuborildi (id={signal_id}): {signal.symbol} {signal.direction.value}")
-        return signal_id
+        return msg.message_id
+
+    async def send_followup(self, text: str, chart_path: str | None = None,
+                            reply_to: int | None = None) -> None:
+        """Signal natijasi bo'yicha follow-up (TP/SL) — asl signalga javob (thread) qilib."""
+        try:
+            if chart_path:
+                await self.bot.send_photo(
+                    chat_id=settings.telegram_channel_id,
+                    photo=FSInputFile(chart_path),
+                    caption=text,
+                    parse_mode=ParseMode.HTML,
+                    reply_to_message_id=reply_to,
+                )
+            else:
+                await self.bot.send_message(
+                    chat_id=settings.telegram_channel_id,
+                    text=text,
+                    parse_mode=ParseMode.HTML,
+                    reply_to_message_id=reply_to,
+                )
+        except Exception as e:  # noqa: BLE001
+            # reply_to xabari o'chirilgan bo'lsa ham follow-up ketaversin
+            log.warning(f"Follow-up reply xatosi ({e}) — thread'siz qayta yuboriladi")
+            if chart_path:
+                await self.bot.send_photo(
+                    chat_id=settings.telegram_channel_id,
+                    photo=FSInputFile(chart_path), caption=text, parse_mode=ParseMode.HTML)
+            else:
+                await self.bot.send_message(
+                    chat_id=settings.telegram_channel_id, text=text, parse_mode=ParseMode.HTML)
 
     def _format_caption(self, signal: Signal) -> str:
         arrow = "🟢 BUY" if signal.is_buy else "🔴 SELL"
@@ -83,8 +113,9 @@ class TitanTelegramBot:
             f"📊 Ishonch: <b>{signal.confidence:.0f}%</b> [{signal.strength.value}]\n"
             f"📍 Entry: <code>{signal.entry}</code>\n"
             f"🛑 Stop Loss: <code>{signal.stop_loss}</code>\n"
-            f"🎯 Take Profit: <code>{signal.take_profit}</code>\n"
-            f"⚖️ Risk/Reward: 1:{signal.risk_reward:.1f}\n"
+            f"🎯 TP1 (1R): <code>{signal.tp1}</code>\n"
+            f"🎯 TP2 (2R): <code>{signal.tp2}</code>\n"
+            f"🎯 TP3 (3R): <code>{signal.tp3}</code>\n"
             f"━━━━━━━━━━━━━━\n"
             f"🤖 <b>Tahlil:</b>\n"
         )
