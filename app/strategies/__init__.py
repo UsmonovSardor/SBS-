@@ -6,6 +6,12 @@ from app.strategies.premium_discount import (
     PremiumDiscountResult,
     PremiumDiscountStrategy,
 )
+from app.strategies.regime import (
+    MarketRegime,
+    RegimeDetector,
+    RegimeResult,
+    WEIGHT_PROFILES,
+)
 from app.strategies.session import SessionInfo, current_session
 
 __all__ = [
@@ -19,4 +25,8 @@ __all__ = [
     "higher_timeframe",
     "current_session",
     "SessionInfo",
+    "MarketRegime",
+    "RegimeDetector",
+    "RegimeResult",
+    "WEIGHT_PROFILES",
 ]

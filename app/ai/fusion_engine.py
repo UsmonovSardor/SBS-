@@ -38,10 +38,11 @@ from app.strategies import (
     HtfBias,
     MomentumStrategy,
     PremiumDiscountStrategy,
+    RegimeDetector,
     current_session,
 )
 
-# Ovoz beruvchilar vazni — yagona manba (jami = 100)
+# Statik vazn manbai (jami = 100). Regime-adaptiv rejim o'chirilganda ishlatiladi.
 WEIGHTS = ACTIVE_WEIGHTS
 
 # Qarama-qarshi ovozlar confidence'ni qancha pasaytiradi (0-1)
@@ -87,10 +88,18 @@ class FusionEngine:
         self,
         risk_reward: float = DEFAULT_RR,
         disabled: set[str] | None = None,
+        adaptive_weights: bool = False,
+        weights_override: dict[str, int] | None = None,
     ) -> None:
         self.risk_reward = risk_reward
         # disabled — o'chirilgan ovozlar (A/B test uchun; ular WAIT ga majburlanadi)
         self.disabled = disabled or set()
+        # adaptive_weights — bozor rejimiga qarab vaznlarni moslash (39/14-bob).
+        # False bo'lsa statik vaznlar ishlatiladi (eski xatti-harakat, A/B uchun).
+        self.adaptive_weights = adaptive_weights
+        # weights_override — statik rejimда ACTIVE_WEIGHTS o'rniga maxsus vaznlar
+        # (vazn sweep / tuning uchun). adaptive_weights=True bo'lsa e'tiborga olinmaydi.
+        self.weights_override = weights_override
         self.structure = StructureAnalyzer(lookback=2)
         self.order_block = OrderBlockAnalyzer()
         self.fvg = FVGAnalyzer()
@@ -98,6 +107,7 @@ class FusionEngine:
         self.momentum = MomentumStrategy()
         self.premium_discount = PremiumDiscountStrategy()
         self.htf_bias = HtfBias()
+        self.regime_detector = RegimeDetector()
 
     # ------------------------------------------------------------------ #
     #  Asosiy: DataFrame -> Signal (yoki None, agar WAIT bo'lsa)
@@ -114,8 +124,15 @@ class FusionEngine:
         price = float(df["close"].iloc[-1])
         avg_range = float((df["high"] - df["low"]).mean()) or 1e-9
 
+        # Bozor rejimini aniqlab, mos vazn profilini tanlaymiz (39/14-bob).
+        regime = self.regime_detector.detect(df)
+        if self.adaptive_weights:
+            weights = regime.weights
+        else:
+            weights = self.weights_override or WEIGHTS
+
         struct = self.structure.analyze(df)
-        votes = self._collect_votes(df, price, avg_range, struct, htf_df)
+        votes = self._collect_votes(df, price, avg_range, struct, htf_df, weights)
 
         buy_score = sum(v.weight for v in votes if v.direction == Direction.BUY)
         sell_score = sum(v.weight for v in votes if v.direction == Direction.SELL)
@@ -186,76 +203,77 @@ class FusionEngine:
     # ------------------------------------------------------------------ #
     #  Ovozlarni yig'ish
     # ------------------------------------------------------------------ #
-    def _collect_votes(self, df, price, avg_range, struct, htf_df=None) -> list[Vote]:
+    def _collect_votes(self, df, price, avg_range, struct, htf_df=None,
+                       weights=WEIGHTS) -> list[Vote]:
         votes: list[Vote] = []
 
         # 1) TREND (structure.trend)
         if struct.trend == Trend.BULLISH:
-            votes.append(Vote("trend", Direction.BUY, WEIGHTS["trend"], 80,
+            votes.append(Vote("trend", Direction.BUY, weights["trend"], 80,
                               "trend yuqoriga (HH+HL)"))
         elif struct.trend == Trend.BEARISH:
-            votes.append(Vote("trend", Direction.SELL, WEIGHTS["trend"], 80,
+            votes.append(Vote("trend", Direction.SELL, weights["trend"], 80,
                               "trend pastga (LH+LL)"))
         else:
-            votes.append(Vote("trend", Direction.WAIT, WEIGHTS["trend"], 0,
+            votes.append(Vote("trend", Direction.WAIT, weights["trend"], 0,
                               "trend aniq emas (range)"))
 
         # 2) STRUCTURE EVENT (oxirgi BOS / CHoCH / MSS)
         ev = struct.last_event
         if ev is not None:
             conf = {"MSS": 90, "BOS": 85}.get(ev.kind, 75)
-            votes.append(Vote("structure", ev.direction, WEIGHTS["structure"], conf,
+            votes.append(Vote("structure", ev.direction, weights["structure"], conf,
                               f"oxirgi {ev.kind} {ev.direction.value} "
                               f"(swing {ev.broken_swing:.5f} buzildi)"))
         else:
-            votes.append(Vote("structure", Direction.WAIT, WEIGHTS["structure"], 0,
+            votes.append(Vote("structure", Direction.WAIT, weights["structure"], 0,
                               "struktura hodisasi yo'q"))
 
         # 3) ORDER BLOCK / BREAKER (narxga yaqin zona)
         ob = self._ob_zone_hit(df, price, avg_range)
         if ob is not None:
-            votes.append(Vote("order_block", ob.direction, WEIGHTS["order_block"],
+            votes.append(Vote("order_block", ob.direction, weights["order_block"],
                               ob.confidence,
                               f"{ob.direction.value} {ob.label} "
                               f"[{ob.bottom:.5f}-{ob.top:.5f}]"))
         else:
-            votes.append(Vote("order_block", Direction.WAIT, WEIGHTS["order_block"], 0,
+            votes.append(Vote("order_block", Direction.WAIT, weights["order_block"], 0,
                               "yaqin OB/Breaker yo'q"))
 
         # 4) FVG / INVERSE FVG (narxga yaqin zona)
         fvg = self._fvg_zone_hit(df, price, avg_range)
         if fvg is not None:
-            votes.append(Vote("fvg", fvg.direction, WEIGHTS["fvg"], fvg.confidence,
+            votes.append(Vote("fvg", fvg.direction, weights["fvg"], fvg.confidence,
                               f"{fvg.direction.value} {fvg.label} "
                               f"[{fvg.bottom:.5f}-{fvg.top:.5f}]"))
         else:
-            votes.append(Vote("fvg", Direction.WAIT, WEIGHTS["fvg"], 0,
+            votes.append(Vote("fvg", Direction.WAIT, weights["fvg"], 0,
                               "yaqin FVG yo'q"))
 
         # 5) LIQUIDITY (oxirgi sweep)
         _, sweeps = self.liquidity.analyze(df)
         if sweeps:
             last_sweep = sweeps[-1]
-            votes.append(Vote("liquidity", last_sweep.direction, WEIGHTS["liquidity"], 75,
+            votes.append(Vote("liquidity", last_sweep.direction, weights["liquidity"], 75,
                               f"{last_sweep.direction.value} liquidity sweep "
                               f"(daraja {last_sweep.level:.5f})"))
         else:
-            votes.append(Vote("liquidity", Direction.WAIT, WEIGHTS["liquidity"], 0,
+            votes.append(Vote("liquidity", Direction.WAIT, weights["liquidity"], 0,
                               "sweep yo'q"))
 
         # 6) MOMENTUM (EMA)
         mom = self.momentum.evaluate(df)
-        votes.append(Vote("momentum", mom.direction, WEIGHTS["momentum"],
+        votes.append(Vote("momentum", mom.direction, weights["momentum"],
                           mom.confidence, mom.reason))
 
         # 7) HTF BIAS (yuqori taymfrejm konfluensi)
         htf = self.htf_bias.evaluate(htf_df)
-        votes.append(Vote("htf_bias", htf.direction, WEIGHTS["htf_bias"],
+        votes.append(Vote("htf_bias", htf.direction, weights["htf_bias"],
                           htf.confidence, htf.reason))
 
         # 8) PREMIUM / DISCOUNT (equilibrium)
         pd_res = self.premium_discount.evaluate(df)
-        votes.append(Vote("premium_discount", pd_res.direction, WEIGHTS["premium_discount"],
+        votes.append(Vote("premium_discount", pd_res.direction, weights["premium_discount"],
                           pd_res.confidence, pd_res.reason))
 
         # A/B test: o'chirilgan ovozlarni WAIT ga majburlash (ballarga qo'shilmaydi)
