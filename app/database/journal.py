@@ -51,6 +51,22 @@ class Journal:
                     signal_id INTEGER
                 )
             """)
+            # Feature-logging (ML/tahlil poydevori): har signalning 7 ovozi (feature)
+            # LONG formatda saqlanadi — yo'qotishsiz, keyin (belgi -> natija) datasetiga
+            # pivot qilinadi. Natija tracked_signals.result dan (created_at bo'yicha) olinadi.
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS signal_votes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    signal_id INTEGER,     -- signals.id ga bog'liq
+                    strategy TEXT,         -- trend, structure, order_block, ...
+                    direction TEXT,        -- BUY | SELL | WAIT
+                    weight REAL,           -- strategiya vazni (ACTIVE_WEIGHTS)
+                    confidence REAL        -- shu ovozning ishonchi (0-100)
+                )
+            """)
+            c.execute(
+                "CREATE INDEX IF NOT EXISTS idx_votes_signal ON signal_votes(signal_id)"
+            )
             # Signal natijasini kuzatish (TP1/TP2/TP3/SL follow-up uchun)
             c.execute("""
                 CREATE TABLE IF NOT EXISTS tracked_signals (
@@ -131,6 +147,19 @@ class Journal:
                  signal.ai_explanation, signal.created_at.isoformat()),
             )
             return cur.lastrowid
+
+    def log_features(self, signal_id: int, signal: Signal) -> None:
+        """Signalning har bir ovozini (feature) signal_votes'ga yozadi.
+        ML/tahlil poydevori — natija bilan bog'lanib (belgi -> natija) dataset beradi."""
+        if not signal.votes:
+            return
+        with self._conn() as c:
+            c.executemany(
+                """INSERT INTO signal_votes (signal_id,strategy,direction,weight,confidence)
+                   VALUES (?,?,?,?,?)""",
+                [(signal_id, v.strategy, v.direction.value, v.weight, v.confidence)
+                 for v in signal.votes],
+            )
 
     def log_trade(self, ticket: int, signal: Signal, lot: float, price: float,
                   signal_id: int | None = None) -> int:

@@ -157,6 +157,8 @@ class TitanOrchestrator:
                     # Grok tarmoq chaqiruvi — event loop'ni bloklamaslik uchun thread'da
                     signal.ai_explanation = await asyncio.to_thread(self.grok.explain_signal, signal)
                     db_id = await asyncio.to_thread(self.journal.log_signal, signal)
+                    # Feature-logging: 7 ovozni (belgi) saqlash — ML/tahlil poydevori
+                    await asyncio.to_thread(self.journal.log_features, db_id, signal)
                     message_id = await self.tgbot.send_signal(signal, chart, signal_db_id=db_id)
                     log.info(f"📤 Yangi signal yuborildi: {signal.summary()}")
 
