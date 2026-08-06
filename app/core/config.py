@@ -67,6 +67,12 @@ class Settings(BaseSettings):
     trail_start_progress: float = Field(default=0.5, alias="TRAIL_START_PROGRESS")  # shu % dan keyin trailing boshlanadi
     trail_lock: float = Field(default=0.5, alias="TRAIL_LOCK")                 # harakatning shu ulushini qulflaydi
 
+    # --- Bilim bazasi (RAG) ---
+    kb_enabled: bool = Field(default=False, alias="KB_ENABLED")                 # signal izohига RAG dars qo'shish (A variant)
+    kb_embed_model: str = Field(default="BAAI/bge-small-en-v1.5", alias="KB_EMBED_MODEL")
+    kb_top_k: int = Field(default=3, alias="KB_TOP_K")                          # nechta mos bo'lak olinsin
+    kb_min_score: float = Field(default=0.3, alias="KB_MIN_SCORE")              # bundan past o'xshashlik e'tiborsiz
+
     # --- Umumiy ---
     timezone: str = Field(default="Asia/Tashkent", alias="TIMEZONE")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")

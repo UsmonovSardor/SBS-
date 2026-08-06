@@ -43,5 +43,10 @@ pydantic-settings==2.4.0
 pytz==2024.1
 loguru==0.7.2
 
+# --- Bilim bazasi (RAG) — semantik embedding, local/offline (ONNX, torch KERAK EMAS) ---
+# Model birinchi ishlatishда ~130MB yuklanadi (keyin keshда). Import LAZY —
+# KB_ENABLED=false bo'lса yoki paket yo'q bo'lса bot baribir ishlaydi.
+fastembed==0.3.6
+
 # --- Test (ixtiyoriy) ---
 pytest==8.3.2

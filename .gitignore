@@ -56,6 +56,7 @@ data/*.csv
 data/*.parquet
 data/*.db
 data/*.sqlite
+data/fastembed_cache/
 *.log
 
 # Docker bind-mount runtime papkalari (faqat serverda, hech qachon commit emas)

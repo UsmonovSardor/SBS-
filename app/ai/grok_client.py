@@ -28,7 +28,10 @@ SYSTEM_PROMPT = (
     "- FVG = Fair Value Gap (uch shamli narx bo'shlig'i / imbalance)\n"
     "- Order Block (OB) = institutsional buyurtma zonasi\n"
     "- Liquidity Sweep = narxning stop-loss'larni yig'ib teskari qaytishi\n"
-    "- HH/HL = Higher High / Higher Low (ko'tarilish tuzilishi)"
+    "- HH/HL = Higher High / Higher Low (ko'tarilish tuzilishi)\n\n"
+    "Agar so'rovда 'BILIM BAZASIDAN' bo'limi berilса — undagi darslarni izohни "
+    "boyitish uchun ishlat (tegishli joyида qo'lla), lekin narx/raqamlar faqat "
+    "signaldан olinsин, bilim bazasи umumiy nazariy kontekst uchun."
 )
 
 
@@ -57,16 +60,17 @@ class GrokClient:
     # ------------------------------------------------------------------ #
     #  Signalni tushuntirish
     # ------------------------------------------------------------------ #
-    def explain_signal(self, signal: Signal) -> str:
+    def explain_signal(self, signal: Signal, kb_context: str = "") -> str:
         """
         Signalni professional tilda tushuntiradi.
+        kb_context — bilim bazasidan topilган tegishli darslar (A variant, RAG).
         Key sozlanmagan bo'lsa — zaxira (texnik) izoh qaytaradi.
         """
         if not self.is_configured:
             log.warning("AI API key yo'q — zaxira izoh ishlatilmoqda.")
             return self._fallback_explanation(signal)
 
-        prompt = self.build_prompt(signal)
+        prompt = self.build_prompt(signal, kb_context)
         try:
             client = self._get_client()
             resp = client.chat.completions.create(
@@ -90,14 +94,16 @@ class GrokClient:
     # ------------------------------------------------------------------ #
     #  Prompt yaratish
     # ------------------------------------------------------------------ #
-    def build_prompt(self, signal: Signal) -> str:
-        """Signal ma'lumotidan Grok uchun so'rov matnini tayyorlaydi."""
+    def build_prompt(self, signal: Signal, kb_context: str = "") -> str:
+        """Signal ma'lumotidan Grok uchun so'rov matnini tayyorlaydi.
+        kb_context berilса — 'BILIM BAZASIDAN' bo'limi qo'shiladi (RAG)."""
         votes_txt = "\n".join(
             f"  - {v.strategy} ({v.direction.value}, ishonch {v.confidence:.0f}%): {v.reason}"
             for v in signal.votes
             if v.direction.value != "WAIT"
         )
         arrow = "SOTIB OLISH (BUY)" if signal.is_buy else "SOTISH (SELL)"
+        kb_block = f"\n\nBILIM BAZASIDAN (tegishli darslar):\n{kb_context}\n" if kb_context.strip() else ""
         return (
             f"Quyidagi savdo signalini tushuntir:\n\n"
             f"Instrument: {signal.symbol}\n"
@@ -108,7 +114,8 @@ class GrokClient:
             f"Stop Loss: {signal.stop_loss}\n"
             f"Take Profit: {signal.take_profit}\n"
             f"Risk/Reward: 1:{signal.risk_reward:.1f}\n\n"
-            f"Signalga asos bo'lgan texnik omillar:\n{votes_txt}\n\n"
+            f"Signalga asos bo'lgan texnik omillar:\n{votes_txt}\n"
+            f"{kb_block}\n"
             f"Shu omillarni mantiqiy bog'lab, nima uchun bu yo'nalish tanlanganini izohlab ber."
         )
 

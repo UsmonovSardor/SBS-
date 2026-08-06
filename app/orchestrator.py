@@ -77,10 +77,51 @@ class TitanOrchestrator:
             self.feed, self.journal, self.renderer, self.tgbot)
         self.ob = OrderBlockAnalyzer()
         self.fvg = FVGAnalyzer()
+        # Bilim bazasi (RAG, A variant) — ixtiyoriy. Xato bo'lsa bot buzilmaydi.
+        self.retriever = self._init_retriever()
 
         self.symbols = settings.symbols
         self.timeframes = [Timeframe(t) for t in settings.scan_timeframe_list]
         self.running = True
+
+    # ------------------------------------------------------------------ #
+    #  Bilim bazasi (RAG) — A variant
+    # ------------------------------------------------------------------ #
+    def _init_retriever(self):
+        """KB_ENABLED bo'lsa retriever quradi. Har qanday xato = KB o'chiq (bot ishlayveradi)."""
+        if not settings.kb_enabled:
+            return None
+        try:
+            from app.knowledge import KnowledgeStore, Embedder, Retriever
+            store = KnowledgeStore()
+            n = store.stats()
+            if n["chunks"] == 0:
+                log.warning("KB_ENABLED=true lekin bilim bazasi bo'sh — ingest qiling. RAG o'chiq.")
+                return None
+            retr = Retriever(store, Embedder(model_name=settings.kb_embed_model))
+            retr.refresh()
+            log.info(f"Bilim bazasi (RAG) yoqildi: {n['docs']} hujjat, {n['chunks']} bo'lak")
+            return retr
+        except Exception as e:  # noqa: BLE001
+            log.error(f"Bilim bazasi yuklanmadi ({e}) — RAG o'chiq, bot davom etadi.")
+            return None
+
+    def _kb_context(self, signal: Signal) -> str:
+        """Signalга mos darslarni bilim bazasidan topib, matn kontekst qaytaradi."""
+        if self.retriever is None:
+            return ""
+        try:
+            active = [v.strategy for v in signal.votes if v.direction == signal.direction]
+            query = (f"{signal.direction.value} {signal.symbol} {signal.timeframe} "
+                     f"{' '.join(active)}")
+            hits = self.retriever.search(
+                query, top_k=settings.kb_top_k, min_score=settings.kb_min_score)
+            if not hits:
+                return ""
+            return "\n".join(f"[{h['title']}] {h['text']}" for h in hits)
+        except Exception as e:  # noqa: BLE001
+            log.warning(f"KB qidiruv xatosi: {e}")
+            return ""
 
     # ------------------------------------------------------------------ #
     #  Skanlash (sinxron — bir tsikl)
@@ -154,8 +195,11 @@ class TitanOrchestrator:
                 )
                 for signal, df in new_signals:
                     chart = self.renderer.render(df, signal, zones=self._build_zones(df, signal.price_at_signal))
+                    # Bilim bazasidan (RAG) tegishli darslar — izohни boyitish (A variant)
+                    kb_context = await asyncio.to_thread(self._kb_context, signal)
                     # Grok tarmoq chaqiruvi — event loop'ni bloklamaslik uchun thread'da
-                    signal.ai_explanation = await asyncio.to_thread(self.grok.explain_signal, signal)
+                    signal.ai_explanation = await asyncio.to_thread(
+                        self.grok.explain_signal, signal, kb_context)
                     db_id = await asyncio.to_thread(self.journal.log_signal, signal)
                     # Feature-logging: 7 ovozni (belgi) saqlash — ML/tahlil poydevori
                     await asyncio.to_thread(self.journal.log_features, db_id, signal)
