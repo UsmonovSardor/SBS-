@@ -97,8 +97,7 @@ class ChartRenderer:
         else:
             title = f"\n{_clean_title(title)}"
 
-        fig, axes = mpf.plot(
-            data,
+        plot_kwargs = dict(
             type="candle",
             style=style,
             title=title,
@@ -108,6 +107,12 @@ class ChartRenderer:
             tight_layout=True,
             update_width_config={"candle_linewidth": 0.8},
         )
+        # Avto-trendline (FAQAT VIZUAL — signal/fusion mantig'iga tegmaydi).
+        alines = self._trendline_alines(data, signal)
+        if alines:
+            plot_kwargs["alines"] = alines
+
+        fig, axes = mpf.plot(data, **plot_kwargs)
         ax = axes[0]
 
         # --- Entry / SL / TP1-2-3 chiziqlari ---
@@ -139,3 +144,23 @@ class ChartRenderer:
     @staticmethod
     def _hline(ax, price: float, color: str, label: str) -> None:
         ax.axhline(price, color=color, linestyle="--", linewidth=1.2, alpha=0.9, label=label)
+
+    @staticmethod
+    def _trendline_alines(data, signal) -> dict | None:
+        """Avto-trendline'ni mplfinance `alines` formatiga tayyorlaydi.
+        VIZUAL-only: xato bo'lsa None (grafik trend chiziqsiz, avvalgidek)."""
+        try:
+            from app.charting.trendline import detect_trendlines
+
+            lines = detect_trendlines(data, is_buy=signal.is_buy)
+            if not lines:
+                return None
+            seqs = [[ln.p1, ln.p2] for ln in lines]
+            colors = ["#f7b731" for _ in lines]  # TradingView-uslub amber trend chizig'i
+            return dict(
+                alines=seqs, colors=colors,
+                linestyle="--", linewidths=1.3, alpha=0.85,
+            )
+        except Exception as e:  # noqa: BLE001
+            log.warning(f"Trendline chizishда xato (o'tkazib yuborildi): {e}")
+            return None
