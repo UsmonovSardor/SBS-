@@ -42,7 +42,18 @@ class SignalTracker:
         self._last_by_symbol: dict[str, datetime] = {}
         self._last_key: dict[tuple, pd.Timestamp] = {}
 
-    def is_new(self, signal: Signal, candle_time: pd.Timestamp) -> bool:
+    def is_new(
+        self,
+        signal: Signal,
+        candle_time: pd.Timestamp,
+        open_keys: set[tuple[str, str]] | frozenset = frozenset(),
+    ) -> bool:
+        # ★ Bir simvol+yo'nalish bo'yicha allaqachon OCHIQ kuzatuv bo'lsa — bu
+        # o'sha jonli g'oyaning takrori. Yopilmaguncha (TP/SL) yangi signal
+        # yubormaymiz. Aks holda bir setup har cooldowndan keyin qayta ochilib,
+        # keyin hammasi birga SL/TP berib, bitta signal 3-4 marta ko'rinadi.
+        if (signal.symbol, signal.direction.value) in open_keys:
+            return False
         # Bir simvol bo'yicha cooldown
         last = self._last_by_symbol.get(signal.symbol)
         if last and datetime.now() - last < self.cooldown:
@@ -129,6 +140,16 @@ class TitanOrchestrator:
     def _scan_sync(self) -> list[tuple[Signal, pd.DataFrame]]:
         """Barcha simvol×TF ni skanlab, YANGI signallarni qaytaradi."""
         new_signals: list[tuple[Signal, pd.DataFrame]] = []
+        # Hozir OCHIQ kuzatilayotgan (symbol, direction) juftliklari — takror
+        # signalni bloklash uchun. DB xatosi skanni to'xtatmasin (himoyalangan).
+        try:
+            open_keys: set[tuple[str, str]] = (
+                self.journal.open_symbol_directions()
+                if settings.signal_tracking else set()
+            )
+        except Exception as e:  # noqa: BLE001
+            log.warning(f"OCHIQ kuzatuvlarni o'qishда xato ({e}) — dedup shu tsiklда o'tkazib yuborildi")
+            open_keys = set()
         for symbol in self.symbols:
             for tf in self.timeframes:
                 try:
@@ -141,8 +162,11 @@ class TitanOrchestrator:
                     )
                     if res.is_signal:
                         candle_time = df.index[-1]
-                        if self.tracker.is_new(res.signal, candle_time):
+                        if self.tracker.is_new(res.signal, candle_time, open_keys):
                             self.tracker.mark(res.signal, candle_time)
+                            # Shu tsiklда qabul qilingan juftlik ham darhol bloklansin
+                            # (masalan bir simvol M5 va M15 da bir vaqtда signal bersa).
+                            open_keys.add((res.signal.symbol, res.signal.direction.value))
                             new_signals.append((res.signal, df))
                 except Exception as e:  # noqa: BLE001
                     # WARNING darajasida — jim qolib ketmasin (ilgari debug edi,

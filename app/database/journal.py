@@ -111,6 +111,16 @@ class Journal:
                 "SELECT * FROM tracked_signals WHERE status='OPEN' ORDER BY id"
             ).fetchall()
 
+    def open_symbol_directions(self) -> set[tuple[str, str]]:
+        """Hozir OCHIQ kuzatilayotgan (symbol, direction) juftliklari.
+        Dedup uchun: shu juftlik ochiq bo'lsa, o'sha g'oyaning takror signali
+        yuborilmaydi (bir simvol+yo'nalish = bitta jonli g'oya)."""
+        with self._conn() as c:
+            rows = c.execute(
+                "SELECT DISTINCT symbol, direction FROM tracked_signals WHERE status='OPEN'"
+            ).fetchall()
+        return {(r["symbol"], r["direction"]) for r in rows}
+
     def update_tracked(self, tid: int, *, stage: int, eff_sl: float,
                        last_checked: str) -> None:
         with self._conn() as c:

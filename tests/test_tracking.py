@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timedelta
 
 import pandas as pd
 
+from app.core.config import settings
 from app.tracking import SignalOutcomeTracker
 
 
@@ -69,7 +71,8 @@ def _row(**kw):
     base = dict(id=1, symbol="EURUSD", timeframe="M5", direction="BUY", digits=5,
                 entry=1.1000, sl=1.0980, tp1=1.1020, tp2=1.1040, tp3=1.1060,
                 message_id=10, stage=0, eff_sl=1.0980, status="OPEN",
-                last_checked="2024-01-01T00:00:00")
+                last_checked="2024-01-01T00:00:00",
+                opened_at=datetime.now().isoformat())  # yaqin -> expiry ishlamaydi
     base.update(kw)
     return base
 
@@ -99,6 +102,21 @@ def test_buy_stop_loss_immediate():
     _run(FakeFeed(df), journal, tgbot)
     assert len(journal.closed) == 1
     assert journal.closed[0][1].startswith("SL")
+
+
+def test_expired_open_closed_silently():
+    # opened_at juda eski -> jimgina yopiladi, Telegram xabari YO'Q, narx tekshirilmaydi
+    old = (datetime.now() - timedelta(hours=settings.outcome_max_age_hours + 1)).isoformat()
+    df = _bars([  # narx SL/TP ga tegmaydi — baribir muddat bo'yicha yopilishi kerak
+        ("2024-01-01 00:00", 1.100, 1.1001, 1.0999, 1.1000),
+        ("2024-01-01 00:05", 1.100, 1.1002, 1.0998, 1.1001),
+    ])
+    journal = FakeJournal([_row(opened_at=old)])
+    tgbot = FakeTgbot()
+    _run(FakeFeed(df), journal, tgbot)
+    assert len(journal.closed) == 1
+    assert "Muddati tugadi" in journal.closed[0][1]
+    assert tgbot.followups == []  # jimgina — hech qanday follow-up yuborilmadi
 
 
 def test_buy_full_tp3():

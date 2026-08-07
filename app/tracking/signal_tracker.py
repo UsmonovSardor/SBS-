@@ -21,6 +21,7 @@ from datetime import datetime
 
 import pandas as pd
 
+from app.core.config import settings
 from app.core.constants import Direction, SignalStrength, Timeframe
 from app.core.logger import log
 from app.ai.signal import Signal
@@ -41,9 +42,39 @@ class SignalOutcomeTracker:
         rows = await asyncio.to_thread(self.journal.active_tracked)
         for row in rows:
             try:
+                # Juda eski (tiqilib qolgan) OCHIQ signalni jimgina yopamiz —
+                # aks holda u simvol+yo'nalishни abadiy bloklab, statistikani
+                # ifloslaydi. Telegramga xabar yuborilmaydi (spam emas).
+                if self._is_expired(row):
+                    await asyncio.to_thread(
+                        self.journal.close_tracked, row["id"],
+                        "Muddati tugadi ⌛ (avtomatik yopildi)")
+                    log.info(
+                        f"Kuzatuv muddati tugadi (jimgina yopildi): "
+                        f"{row['symbol']} {row['direction']} id={row['id']}")
+                    continue
                 await self._check_one(row)
             except Exception as e:  # noqa: BLE001
                 log.warning(f"Kuzatuv xatosi (id={row['id']} {row['symbol']}): {e}")
+
+    @staticmethod
+    def _is_expired(row) -> bool:
+        """OCHIQ signal OUTCOME_MAX_AGE_HOURS dan eskimi? opened_at yo'q/noto'g'ri
+        bo'lsa — eskirmagan deb hisoblanadi (testlarni va eski yozuvlarni buzmaslik)."""
+        max_h = settings.outcome_max_age_hours
+        if max_h <= 0:
+            return False
+        try:
+            opened = row["opened_at"]
+        except (KeyError, IndexError, TypeError):
+            return False
+        if not opened:
+            return False
+        try:
+            age_h = (datetime.now() - datetime.fromisoformat(opened)).total_seconds() / 3600
+        except (ValueError, TypeError):
+            return False
+        return age_h > max_h
 
     # ------------------------------------------------------------------ #
     async def _check_one(self, row) -> None:

@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     # --- Signal natijasini kuzatish (TP1/TP2/TP3/SL follow-up) ---
     signal_tracking: bool = Field(default=True, alias="SIGNAL_TRACKING")     # signal natijasini kuzatib follow-up yuborish
     outcome_interval: int = Field(default=30, alias="OUTCOME_INTERVAL")      # kuzatuv tsikli oralig'i (soniya)
+    outcome_max_age_hours: int = Field(default=12, alias="OUTCOME_MAX_AGE_HOURS")  # OCHIQ kuzatuv shu soatdan eski bo'lsa jimgina yopiladi (M5/M15 skalp signal bunchada tirik emas). 0 = o'chiq
 
     # --- Pozitsiya monitoringi (trailing / break-even) ---
     position_manage: bool = Field(default=True, alias="POSITION_MANAGE")       # BE/trailing yoqilganmi

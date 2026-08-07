@@ -9,6 +9,7 @@ qo'shadi. Natija — PNG fayl (Telegram'ga yuborish uchun).
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,6 +28,25 @@ from app.ai.signal import Signal  # noqa: E402
 
 CHARTS_DIR = BASE_DIR / "charts"
 CHARTS_DIR.mkdir(exist_ok=True)
+
+# Grafik shrifti (DejaVu Sans) emoji glyphlarini bilmaydi -> PNG sarlavhasida
+# bo'sh kvadrat chiqadi (noprofessional) + matplotlib warning. Sarlavhadagi
+# emoji va variation-selectorlarni olib tashlaymiz (matn Telegram captionда
+# to'liq emoji bilan qoladi, faqat rasm ustidagi yozuv toza bo'ladi).
+_EMOJI_RE = re.compile(
+    "[\U0001F000-\U0001FAFF"   # turli emoji bloklari
+    "\U00002600-\U000027BF"    # Misc symbols + Dingbats (✅ ⚖ ✔ ...)
+    "\U00002B00-\U00002BFF"    # o'qlar/yulduzlar (⭐ ...)
+    "\U0001F1E6-\U0001F1FF"    # bayroqlar
+    "\U0000FE00-\U0000FE0F"    # variation selectors
+    "\U00002049\U00002139\U0000203C]+",  # ⁉ ℹ ‼
+    flags=re.UNICODE,
+)
+
+
+def _clean_title(text: str) -> str:
+    """Sarlavhadan emoji/glyphsiz belgilarni olib tashlab, ortiqcha bo'shliqni yig'adi."""
+    return re.sub(r"\s{2,}", " ", _EMOJI_RE.sub("", text)).strip()
 
 
 @dataclass
@@ -75,7 +95,7 @@ class ChartRenderer:
                 f"conf {signal.confidence:.0f}% [{signal.strength.value}]   RR 1:{signal.risk_reward:.1f}"
             )
         else:
-            title = f"\n{title}"
+            title = f"\n{_clean_title(title)}"
 
         fig, axes = mpf.plot(
             data,
