@@ -83,3 +83,4 @@ desktop.ini
 # --- MetaTrader ---
 *.ex5
 *.mq5
+scratchpad/
