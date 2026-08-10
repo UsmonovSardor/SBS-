@@ -82,7 +82,7 @@ fetch('stats.json').then(r=>r.json()).then(render).catch(e=>{
 
 function render(d){
   const k = d.kpi;
-  $('sub').textContent = `Yangilangan: ${d.generated_at}`;
+  $('sub').textContent = `Yangilangan: ${d.generated_at} · 🇺🇿 Toshkent vaqti (UTC+5)`;
   $('app').style.display='block';
 
   const kpi = (lbl,val,cls='') => `<div class="kpi"><div class="lbl">${lbl}</div><div class="val ${cls}">${val}</div></div>`;

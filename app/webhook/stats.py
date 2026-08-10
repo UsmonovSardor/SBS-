@@ -10,11 +10,29 @@ FAQAT o'qiydi — hech narsa o'zgartirmaydi. Webhook (tvhook) xizmati ishlatadi.
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.core.config import BASE_DIR
 
 DB_PATH = BASE_DIR / "data" / "titan.db"
+UZ_OFFSET = timedelta(hours=5)   # Toshkent = UTC+5 (yil bo'yi, DST yo'q)
+
+
+def _uz(iso: str | None) -> str:
+    """Konteyner (UTC) ISO vaqtini Toshkent vaqtiga o'giradi: '2026-08-10 17:07'."""
+    if not iso:
+        return ""
+    try:
+        dt = datetime.fromisoformat(iso)
+    except ValueError:
+        return iso[:16]
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return (dt + UZ_OFFSET).strftime("%Y-%m-%d %H:%M")
+
+
+def _now_uz() -> str:
+    return (datetime.now(timezone.utc).replace(tzinfo=None) + UZ_OFFSET).strftime("%Y-%m-%d %H:%M")
 
 
 def _r(result: str | None) -> float | None:
@@ -75,7 +93,7 @@ def compute_stats() -> dict:
 
         if "tracked_signals" not in tables:
             return {
-                "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+                "generated_at": _now_uz(),
                 "kpi": {"signals_total": signals_total, "executed": executed,
                         "resolved": 0, "open": 0, "wins": 0, "losses": 0, "breakeven": 0,
                         "win_rate": 0.0, "expectancy": 0.0, "profit_factor": 0.0,
@@ -126,7 +144,7 @@ def compute_stats() -> dict:
         equity = []
         for i, x in enumerate(resolved, 1):
             cum += x["r"]
-            equity.append({"i": i, "t": (x["closed_at"] or "")[:16], "cum": round(cum, 2)})
+            equity.append({"i": i, "t": _uz(x["closed_at"]), "cum": round(cum, 2)})
         # max drawdown (R)
         peak = 0.0
         maxdd = 0.0
@@ -137,7 +155,7 @@ def compute_stats() -> dict:
             maxdd = min(maxdd, c - peak)
 
         recent = [{
-            "t": (x["closed_at"] or x["opened_at"] or "")[:16],
+            "t": _uz(x["closed_at"] or x["opened_at"]),
             "symbol": x["symbol"], "tf": x["timeframe"],
             "dir": x["direction"], "result": x["result"], "r": x["r"],
         } for x in reversed(resolved)][:15]
