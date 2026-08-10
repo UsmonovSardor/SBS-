@@ -35,6 +35,21 @@ def _now_uz() -> str:
     return (datetime.now(timezone.utc).replace(tzinfo=None) + UZ_OFFSET).strftime("%Y-%m-%d %H:%M")
 
 
+def _cutoff(period: str) -> str | None:
+    """Davr boshini UTC ISO satr sifatida qaytaradi (DB UTC bilan solishtirish uchun).
+    Chegaralar Toshkent vaqtida hisoblanadi. 'all' -> None (filtrsiz)."""
+    now_uz = datetime.now(timezone.utc).replace(tzinfo=None) + UZ_OFFSET
+    if period == "today":
+        start_uz = now_uz.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == "week":
+        start_uz = now_uz - timedelta(days=7)
+    elif period == "month":
+        start_uz = now_uz - timedelta(days=30)
+    else:
+        return None
+    return (start_uz - UZ_OFFSET).isoformat()
+
+
 def _r(result: str | None) -> float | None:
     """result matnini R-multiplikatorga o'giradi (chetlatilsa None)."""
     if not result:
@@ -74,26 +89,35 @@ def _agg(rows, key):
     return sorted(out, key=lambda d: -d["n"])
 
 
-def compute_stats() -> dict:
+def compute_stats(period: str = "all") -> dict:
+    if period not in ("today", "week", "month", "all"):
+        period = "all"
+    cutoff = _cutoff(period)
     conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True, timeout=5)
     conn.row_factory = sqlite3.Row
     try:
         tables = {r[0] for r in conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
 
-        def count(sql: str) -> int:
+        def count(sql: str, args: tuple = ()) -> int:
             try:
-                return conn.execute(sql).fetchone()[0]
+                return conn.execute(sql, args).fetchone()[0]
             except sqlite3.OperationalError:
                 return 0
 
-        signals_total = count("SELECT COUNT(*) FROM signals")
-        executed = count("SELECT COUNT(*) FROM trades")
+        # cutoff — ichki hisoblangan ISO satr (foydalanuvchi kiritmasi emas), lekin
+        # baribir parametrli so'rov ishlatamiz.
+        cut_args = (cutoff,) if cutoff else ()
+        sig_where = " WHERE created_at >= ?" if cutoff else ""
+        trd_where = " WHERE opened_at >= ?" if cutoff else ""
+
+        signals_total = count("SELECT COUNT(*) FROM signals" + sig_where, cut_args)
+        executed = count("SELECT COUNT(*) FROM trades" + trd_where, cut_args)
         open_n = count("SELECT COUNT(*) FROM tracked_signals WHERE status='OPEN'")
 
         if "tracked_signals" not in tables:
             return {
-                "generated_at": _now_uz(),
+                "generated_at": _now_uz(), "period": period,
                 "kpi": {"signals_total": signals_total, "executed": executed,
                         "resolved": 0, "open": 0, "wins": 0, "losses": 0, "breakeven": 0,
                         "win_rate": 0.0, "expectancy": 0.0, "profit_factor": 0.0,
@@ -102,9 +126,10 @@ def compute_stats() -> dict:
                 "equity": [], "recent": [],
             }
 
-        tr = conn.execute(
-            """SELECT symbol, timeframe, direction, result, opened_at, closed_at
-               FROM tracked_signals WHERE status='CLOSED' ORDER BY closed_at""").fetchall()
+        tr_sql = ("SELECT symbol, timeframe, direction, result, opened_at, closed_at "
+                  "FROM tracked_signals WHERE status='CLOSED'"
+                  + (" AND opened_at >= ?" if cutoff else "") + " ORDER BY closed_at")
+        tr = conn.execute(tr_sql, cut_args).fetchall()
 
         # R bilan boyitilgan toza natijalar
         resolved = []
@@ -161,7 +186,7 @@ def compute_stats() -> dict:
         } for x in reversed(resolved)][:15]
 
         return {
-            "generated_at": _now_uz(),
+            "generated_at": _now_uz(), "period": period,
             "kpi": {
                 "signals_total": signals_total, "executed": executed,
                 "resolved": n, "open": open_n,

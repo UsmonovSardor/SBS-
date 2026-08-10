@@ -17,6 +17,11 @@
     -webkit-font-smoothing:antialiased;padding:16px 14px 40px;max-width:1100px;margin:0 auto}
   h1{font-size:19px;margin:0 0 2px;letter-spacing:.2px}
   .sub{color:var(--mut);font-size:12px;margin-bottom:16px}
+  .filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .filters button{background:var(--card);border:1px solid var(--line);color:var(--mut);
+    padding:8px 18px;border-radius:20px;font-size:13px;cursor:pointer;font-weight:600;transition:.15s}
+  .filters button:hover{border-color:var(--blu);color:var(--tx)}
+  .filters button.active{background:var(--blu);border-color:var(--blu);color:#fff}
   .grid{display:grid;gap:12px}
   .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:14px}
   .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
@@ -46,6 +51,12 @@
   <h1>📊 TITAN AI — Signal Statistikasi</h1>
   <div class="sub" id="sub">Yuklanmoqda…</div>
   <div id="app" style="display:none">
+    <div class="filters" id="filters">
+      <button data-p="today">Bugun</button>
+      <button data-p="week">Hafta</button>
+      <button data-p="month">Oy</button>
+      <button data-p="all" class="active">Umumiy</button>
+    </div>
     <div class="grid kpis" id="kpis"></div>
     <div class="card full" style="margin-bottom:12px">
       <h2>Equity egri chizig'i (kümülativ R)</h2>
@@ -75,14 +86,26 @@ Chart.defaults.color = MUT; Chart.defaults.borderColor = LINE; Chart.defaults.fo
 const rc = v => v>0?'pos':v<0?'neg':'neu';
 const sign = v => (v>0?'+':'')+v;
 
-fetch('stats.json').then(r=>r.json()).then(render).catch(e=>{
-  $('sub').style.display='none'; $('err').style.display='block';
-  $('err').textContent='Statistikani yuklab bo\'lmadi: '+e;
+let charts = {};
+const PNAME = {today:'Bugun', week:'Oxirgi 7 kun', month:'Oxirgi 30 kun', all:'Umumiy'};
+function destroyCharts(){ for(const k in charts){ try{charts[k].destroy()}catch(e){} } charts={}; }
+
+function load(p){
+  document.querySelectorAll('#filters button').forEach(b=>b.classList.toggle('active', b.dataset.p===p));
+  fetch('stats.json?period='+p).then(r=>r.json()).then(render).catch(e=>{
+    $('sub').style.display='none'; $('err').style.display='block';
+    $('err').textContent='Statistikani yuklab bo\'lmadi: '+e;
+  });
+}
+document.getElementById('filters').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if(b) load(b.dataset.p);
 });
+load('all');
 
 function render(d){
+  destroyCharts();
   const k = d.kpi;
-  $('sub').textContent = `Yangilangan: ${d.generated_at} · 🇺🇿 Toshkent vaqti (UTC+5)`;
+  $('sub').textContent = `${PNAME[d.period]||''} · Yangilangan: ${d.generated_at} · 🇺🇿 Toshkent vaqti (UTC+5)`;
   $('app').style.display='block';
 
   const kpi = (lbl,val,cls='') => `<div class="kpi"><div class="lbl">${lbl}</div><div class="val ${cls}">${val}</div></div>`;
@@ -97,7 +120,7 @@ function render(d){
     kpi('Ochiq', k.open);
 
   // Equity
-  new Chart($('equity'), {type:'line',
+  charts.equity = new Chart($('equity'), {type:'line',
     data:{labels:d.equity.map(e=>e.i),
       datasets:[{data:d.equity.map(e=>e.cum),borderColor:B,backgroundColor:'rgba(76,141,255,.12)',
         fill:true,tension:.25,pointRadius:0,borderWidth:2}]},
@@ -109,12 +132,12 @@ function render(d){
   const rd = d.result_dist, order=['TP3','TP1','Breakeven','Muddati','SL','Duplikat'];
   const colors={TP3:G,TP1:'#66bb6a',Breakeven:A,Muddati:MUT,SL:R,Duplikat:'#555'};
   const labs=order.filter(x=>rd[x]);
-  new Chart($('results'), {type:'doughnut',
+  charts.results = new Chart($('results'), {type:'doughnut',
     data:{labels:labs,datasets:[{data:labs.map(x=>rd[x]),backgroundColor:labs.map(x=>colors[x]),borderWidth:0}]},
     options:{plugins:{legend:{position:'right',labels:{boxWidth:12,padding:8}}},cutout:'58%'}});
 
   // Direction bar (expectancy)
-  const bar=(el,rows,unit='R')=>new Chart($(el),{type:'bar',
+  const bar=(el,rows,unit='R')=>charts[el]=new Chart($(el),{type:'bar',
     data:{labels:rows.map(r=>r.key+' ('+r.n+')'),
       datasets:[{data:rows.map(r=>r.exp),backgroundColor:rows.map(r=>r.exp>=0?G:R),borderRadius:6}]},
     options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{

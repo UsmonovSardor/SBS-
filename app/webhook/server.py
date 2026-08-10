@@ -197,10 +197,10 @@ def build_app() -> FastAPI:
             return HTMLResponse("<h1>Dashboard topilmadi</h1>", status_code=500)
 
     @app.get("/stats.json")
-    async def stats_json() -> JSONResponse:
+    async def stats_json(period: str = Query(default="all")) -> JSONResponse:
         from app.webhook.stats import compute_stats
         try:
-            return JSONResponse(compute_stats())
+            return JSONResponse(compute_stats(period))
         except Exception as e:  # noqa: BLE001
             log.error(f"Statistika hisoblash xatosi: {e}")
             return JSONResponse({"error": str(e)}, status_code=500)
