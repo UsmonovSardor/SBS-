@@ -55,6 +55,44 @@ services:
     networks:
       - mt5net
 
+  # ── TradingView webhook (ALOHIDA jarayon — asosiy botga tegmaydi) ─────────
+  # Bot bilan BIR XIL image, lekin boshqa buyruq (webhook_main.py). MT5 kerak
+  # emas, shuning uchun depends_on YO'Q — mustaqil ishlaydi.
+  tvhook:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: tvhook
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: ["python", "webhook_main.py"]
+    networks:
+      - mt5net
+    # Host portga chiqarish shart emas — Caddy ichki tarmoqdan "tvhook:8080" ko'radi.
+
+  # ── Caddy reverse-proxy (avtomatik HTTPS / Let's Encrypt) ─────────────────
+  # TradingView webhook faqat 80/443'da ishlaydi. WEBHOOK_DOMAIN shu serverga
+  # qaragan bo'lsa, Caddy sertifikatni AVTOMATIK oladi. Domen bo'lmasa bu
+  # xizmatni o'chirib qo'ying (Cloudflare Tunnel muqobil).
+  caddy:
+    image: caddy:2
+    container_name: caddy
+    restart: unless-stopped
+    depends_on:
+      - tvhook
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - WEBHOOK_DOMAIN=${WEBHOOK_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy-data:/data
+      - ./caddy-config:/config
+    networks:
+      - mt5net
+
 networks:
   mt5net:
     driver: bridge

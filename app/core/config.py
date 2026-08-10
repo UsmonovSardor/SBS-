@@ -74,6 +74,11 @@ class Settings(BaseSettings):
     kb_top_k: int = Field(default=3, alias="KB_TOP_K")                          # nechta mos bo'lak olinsin
     kb_min_score: float = Field(default=0.3, alias="KB_MIN_SCORE")              # bundan past o'xshashlik e'tiborsiz
 
+    # --- TradingView webhook (alohida xizmat: webhook_main.py) ---
+    tv_webhook_secret: str = Field(default="", alias="TV_WEBHOOK_SECRET")        # maxfiy so'z (fail-closed). Bo'sh = hamma so'rov rad etiladi
+    tv_webhook_port: int = Field(default=8080, alias="TV_WEBHOOK_PORT")          # ichki port (reverse-proxy orqasida)
+    tv_webhook_channel_id: str = Field(default="", alias="TV_WEBHOOK_CHANNEL_ID")  # bo'sh = TELEGRAM_CHANNEL_ID ishlatiladi
+
     # --- Umumiy ---
     timezone: str = Field(default="Asia/Tashkent", alias="TIMEZONE")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")

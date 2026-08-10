@@ -34,6 +34,11 @@ httpx==0.27.0
 # --- Telegram bot ---
 aiogram==3.10.0
 
+# --- TradingView webhook xizmati (alohida konteyner: webhook_main.py) ---
+# Asosiy bot bularni ishlatmaydi; faqat tvhook xizmati uchun.
+fastapi==0.111.0
+uvicorn==0.30.1
+
 # --- Sozlamalar / muhit ---
 python-dotenv==1.0.1
 pydantic==2.8.2

@@ -1,0 +1,18 @@
+# TITAN AI — Caddy reverse-proxy (TradingView webhook uchun avtomatik HTTPS).
+# WEBHOOK_DOMAIN .env'dan olinadi va shu serverga (169.58.123.223) qaragan bo'lishi shart.
+# Caddy Let's Encrypt sertifikatini avtomatik oladi/yangilaydi.
+
+{$WEBHOOK_DOMAIN} {
+	encode gzip
+
+	# Faqat webhook yo'llari tashqariga ochiq
+	@hook path /tv-webhook /health
+	handle @hook {
+		reverse_proxy tvhook:8080
+	}
+
+	# Qolgan hamma narsa 404
+	handle {
+		respond "not found" 404
+	}
+}
