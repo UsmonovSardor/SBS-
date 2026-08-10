@@ -161,7 +161,7 @@ def compute_stats() -> dict:
         } for x in reversed(resolved)][:15]
 
         return {
-            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+            "generated_at": _now_uz(),
             "kpi": {
                 "signals_total": signals_total, "executed": executed,
                 "resolved": n, "open": open_n,
