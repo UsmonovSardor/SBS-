@@ -25,12 +25,14 @@ def _r(result: str | None) -> float | None:
         return None                      # toza natija emas — chetlatiladi
     if "Stop Loss" in result:
         return -1.0
+    # DIQQAT: "Breakeven (TP1 dan keyin...)" matnida "TP1" bor — Breakeven'ni
+    # TP1/TP3 dan OLDIN tekshirish shart, aks holda 0R xato +1R sanaladi.
+    if "Breakeven" in result:
+        return 0.0
     if "TP3" in result:
         return 3.0
     if "TP1" in result:
         return 1.0
-    if "Breakeven" in result:
-        return 0.0
     return None
 
 
@@ -92,9 +94,9 @@ def compute_stats() -> dict:
         for row in tr:
             res = row["result"] or ""
             short = ("SL" if "Stop Loss" in res else
+                     "Breakeven" if "Breakeven" in res else   # TP1'dan OLDIN (matnda "TP1" bor)
                      "TP3" if "TP3" in res else
                      "TP1" if "TP1" in res else
-                     "Breakeven" if "Breakeven" in res else
                      "Muddati" if "Muddati" in res else
                      "Duplikat" if "Duplikat" in res else "Boshqa")
             result_dist[short] = result_dist.get(short, 0) + 1
