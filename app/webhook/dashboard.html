@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>TITAN AI — Signal Statistikasi</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0b0e14; --card:#131722; --card2:#0f131c; --line:#1e2635;
+    --tx:#e6e9ef; --mut:#8b93a7; --grn:#26a69a; --red:#ef5350; --amb:#f7b731; --blu:#4c8dff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"DM Sans",sans-serif;
+    -webkit-font-smoothing:antialiased;padding:16px 14px 40px;max-width:1100px;margin:0 auto}
+  h1{font-size:19px;margin:0 0 2px;letter-spacing:.2px}
+  .sub{color:var(--mut);font-size:12px;margin-bottom:16px}
+  .grid{display:grid;gap:12px}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:14px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .kpi .lbl{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.6px}
+  .kpi .val{font-size:24px;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums}
+  .pos{color:var(--grn)} .neg{color:var(--red)} .neu{color:var(--amb)}
+  .cards{grid-template-columns:1fr 1fr}
+  @media(max-width:720px){.cards{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .card h2{font-size:13px;margin:0 0 12px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+  .full{grid-column:1/-1}
+  canvas{max-height:280px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+  .pill.buy{background:rgba(38,166,154,.15);color:var(--grn)}
+  .pill.sell{background:rgba(239,83,80,.15);color:var(--red)}
+  .note{margin-top:18px;padding:12px 14px;background:rgba(247,183,49,.08);
+    border:1px solid rgba(247,183,49,.25);border-radius:12px;color:#e8d9b0;font-size:12px;line-height:1.5}
+  .err{color:var(--red);padding:20px}
+  .foot{color:var(--mut);font-size:11px;text-align:center;margin-top:22px}
+</style>
+</head>
+<body>
+  <h1>📊 TITAN AI — Signal Statistikasi</h1>
+  <div class="sub" id="sub">Yuklanmoqda…</div>
+  <div id="app" style="display:none">
+    <div class="grid kpis" id="kpis"></div>
+    <div class="card full" style="margin-bottom:12px">
+      <h2>Equity egri chizig'i (kümülativ R)</h2>
+      <canvas id="equity"></canvas>
+    </div>
+    <div class="grid cards" style="margin-bottom:12px">
+      <div class="card"><h2>Natijalar taqsimoti</h2><canvas id="results"></canvas></div>
+      <div class="card"><h2>Yo'nalish bo'yicha (BUY / SELL)</h2><canvas id="dir"></canvas></div>
+    </div>
+    <div class="grid cards" style="margin-bottom:12px">
+      <div class="card"><h2>Simvol bo'yicha (expectancy R)</h2><canvas id="sym"></canvas></div>
+      <div class="card"><h2>Timeframe bo'yicha (expectancy R)</h2><canvas id="tf"></canvas></div>
+    </div>
+    <div class="card full">
+      <h2>Oxirgi signallar</h2>
+      <div style="overflow-x:auto"><table id="recent"></table></div>
+    </div>
+    <div class="note" id="honest"></div>
+    <div class="foot">⚠️ Demo signal statistikasi — moliyaviy maslahat emas. Har yangilanish jonli jurnal'dan.</div>
+  </div>
+  <div class="err" id="err" style="display:none"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const G='#26a69a', R='#ef5350', A='#f7b731', B='#4c8dff', MUT='#8b93a7', LINE='#1e2635';
+Chart.defaults.color = MUT; Chart.defaults.borderColor = LINE; Chart.defaults.font.family='inherit';
+const rc = v => v>0?'pos':v<0?'neg':'neu';
+const sign = v => (v>0?'+':'')+v;
+
+fetch('stats.json').then(r=>r.json()).then(render).catch(e=>{
+  $('sub').style.display='none'; $('err').style.display='block';
+  $('err').textContent='Statistikani yuklab bo\'lmadi: '+e;
+});
+
+function render(d){
+  const k = d.kpi;
+  $('sub').textContent = `Yangilangan: ${d.generated_at}`;
+  $('app').style.display='block';
+
+  const kpi = (lbl,val,cls='') => `<div class="kpi"><div class="lbl">${lbl}</div><div class="val ${cls}">${val}</div></div>`;
+  $('kpis').innerHTML =
+    kpi('Signallar', k.signals_total) +
+    kpi('Natijalangan', k.resolved) +
+    kpi('Win-rate', k.win_rate+'%', rc(k.win_rate-40)) +
+    kpi('Expectancy', sign(k.expectancy)+'R', rc(k.expectancy)) +
+    kpi('Profit Factor', k.profit_factor, rc(k.profit_factor-1)) +
+    kpi('Jami R', sign(k.total_r)+'R', rc(k.total_r)) +
+    kpi('Max Drawdown', k.max_dd_r+'R', 'neg') +
+    kpi('Ochiq', k.open);
+
+  // Equity
+  new Chart($('equity'), {type:'line',
+    data:{labels:d.equity.map(e=>e.i),
+      datasets:[{data:d.equity.map(e=>e.cum),borderColor:B,backgroundColor:'rgba(76,141,255,.12)',
+        fill:true,tension:.25,pointRadius:0,borderWidth:2}]},
+    options:{plugins:{legend:{display:false},tooltip:{callbacks:{
+      title:(t)=>'Signal #'+t[0].label, label:(c)=>'Kümülativ: '+sign(c.parsed.y)+'R'}}},
+      scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8}},y:{grid:{color:LINE},title:{display:true,text:'R'}}}}});
+
+  // Result doughnut
+  const rd = d.result_dist, order=['TP3','TP1','Breakeven','Muddati','SL','Duplikat'];
+  const colors={TP3:G,TP1:'#66bb6a',Breakeven:A,Muddati:MUT,SL:R,Duplikat:'#555'};
+  const labs=order.filter(x=>rd[x]);
+  new Chart($('results'), {type:'doughnut',
+    data:{labels:labs,datasets:[{data:labs.map(x=>rd[x]),backgroundColor:labs.map(x=>colors[x]),borderWidth:0}]},
+    options:{plugins:{legend:{position:'right',labels:{boxWidth:12,padding:8}}},cutout:'58%'}});
+
+  // Direction bar (expectancy)
+  const bar=(el,rows,unit='R')=>new Chart($(el),{type:'bar',
+    data:{labels:rows.map(r=>r.key+' ('+r.n+')'),
+      datasets:[{data:rows.map(r=>r.exp),backgroundColor:rows.map(r=>r.exp>=0?G:R),borderRadius:6}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{
+      label:c=>'exp '+sign(c.parsed.x)+unit+'  ·  WR '+rows[c.dataIndex].win_rate+'%'}}},
+      scales:{x:{grid:{color:LINE},title:{display:true,text:'expectancy '+unit}},y:{grid:{display:false}}}}});
+  bar('dir', d.by_direction); bar('sym', d.by_symbol); bar('tf', d.by_tf);
+
+  // Recent table
+  let h='<tr><th>Vaqt</th><th>Simvol</th><th>TF</th><th>Yo\'nalish</th><th>Natija</th><th class="num">R</th></tr>';
+  for(const x of d.recent){
+    const cls = x.dir==='BUY'?'buy':'sell';
+    h+=`<tr><td>${x.t}</td><td>${x.symbol}</td><td>${x.tf}</td>`+
+       `<td><span class="pill ${cls}">${x.dir}</span></td><td>${x.result}</td>`+
+       `<td class="num ${rc(x.r)}">${sign(x.r)}R</td></tr>`;
+  }
+  $('recent').innerHTML=h;
+
+  // Honest note
+  const pf=k.profit_factor, ex=k.expectancy;
+  $('honest').innerHTML = (ex>=0 && pf>=1)
+    ? `<b>Holat:</b> namunada expectancy musbat (${sign(ex)}R, PF ${pf}). Namuna kichik (${k.resolved} natija) — davom etib kuzatiladi.`
+    : `<b>Halol baho:</b> hozirgi namunada (${k.resolved} natija) expectancy <b>${sign(ex)}R</b>, Profit Factor <b>${pf}</b> — ya'ni bu signal to'plami hozircha <b>foydali edge ko'rsatmayapti</b>. Bu — signal/ta'lim vositasi; real pul uchun tasdiqlangan edge kerak.`;
+}
+</script>
+</body>
+</html>

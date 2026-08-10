@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     tv_webhook_secret: str = Field(default="", alias="TV_WEBHOOK_SECRET")        # maxfiy so'z (fail-closed). Bo'sh = hamma so'rov rad etiladi
     tv_webhook_port: int = Field(default=8080, alias="TV_WEBHOOK_PORT")          # ichki port (reverse-proxy orqasida)
     tv_webhook_channel_id: str = Field(default="", alias="TV_WEBHOOK_CHANNEL_ID")  # bo'sh = TELEGRAM_CHANNEL_ID ishlatiladi
+    stats_url: str = Field(default="", alias="STATS_URL")                         # signal ostidagi "Statistika" tugmasi manzili (bo'sh = tugma ko'rsatilmaydi)
 
     # --- Umumiy ---
     timezone: str = Field(default="Asia/Tashkent", alias="TIMEZONE")

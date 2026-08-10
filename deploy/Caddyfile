@@ -5,8 +5,8 @@
 {$WEBHOOK_DOMAIN} {
 	encode gzip
 
-	# Faqat webhook yo'llari tashqariga ochiq
-	@hook path /tv-webhook /health
+	# Webhook + statistika dashboardi yo'llari tashqariga ochiq
+	@hook path /tv-webhook /health /stats /stats.json
 	handle @hook {
 		reverse_proxy tvhook:8080
 	}

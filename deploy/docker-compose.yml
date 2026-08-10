@@ -67,6 +67,9 @@ services:
     env_file:
       - .env
     command: ["python", "webhook_main.py"]
+    volumes:
+      # Statistika dashboardi jurnalni O'QIYDI (read-only — bot yozuviga xalaqit bermaydi).
+      - ./bot-data:/app/data:ro
     networks:
       - mt5net
     # Host portga chiqarish shart emas — Caddy ichki tarmoqdan "tvhook:8080" ko'radi.

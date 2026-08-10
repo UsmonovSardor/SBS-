@@ -31,13 +31,17 @@ from __future__ import annotations
 import hmac
 import html
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import httpx
 from fastapi import FastAPI, Header, Query, Request, Response, status
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.core.config import settings
 from app.core.logger import log
+
+_DASHBOARD = Path(__file__).with_name("dashboard.html")
 
 TG_API = "https://api.telegram.org"
 _ARROW = {"BUY": "🟢 BUY", "LONG": "🟢 BUY", "SELL": "🔴 SELL", "SHORT": "🔴 SELL"}
@@ -183,6 +187,23 @@ def build_app() -> FastAPI:
             "channel_set": bool(settings.tv_webhook_channel_id or settings.telegram_channel_id),
             "time": datetime.now(timezone.utc).isoformat(),
         }
+
+    @app.get("/stats", response_class=HTMLResponse)
+    async def stats_page() -> HTMLResponse:
+        try:
+            return HTMLResponse(_DASHBOARD.read_text(encoding="utf-8"))
+        except Exception as e:  # noqa: BLE001
+            log.error(f"Dashboard o'qish xatosi: {e}")
+            return HTMLResponse("<h1>Dashboard topilmadi</h1>", status_code=500)
+
+    @app.get("/stats.json")
+    async def stats_json() -> JSONResponse:
+        from app.webhook.stats import compute_stats
+        try:
+            return JSONResponse(compute_stats())
+        except Exception as e:  # noqa: BLE001
+            log.error(f"Statistika hisoblash xatosi: {e}")
+            return JSONResponse({"error": str(e)}, status_code=500)
 
     @app.post("/tv-webhook")
     async def tv_webhook(
